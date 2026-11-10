@@ -48,14 +48,16 @@ export default function LoginPage() {
   if (!selectedStaffId) {
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-8 p-8">
-        <h1 className="text-2xl font-semibold">Mabeste POS</h1>
+        <h1 className="text-2xl font-semibold">
+          Mabeste <span className="text-amber-600 dark:text-amber-400">POS</span>
+        </h1>
         {listError && <p className="text-red-600">{listError}</p>}
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
           {staffList.map((s) => (
             <button
               key={s.id}
               onClick={() => setSelectedStaffId(s.id)}
-              className="rounded-xl border border-black/10 bg-white px-8 py-6 text-lg font-medium shadow-sm transition-colors hover:bg-zinc-50 dark:border-white/10 dark:bg-zinc-900 dark:hover:bg-zinc-800"
+              className="rounded-xl border border-black/10 bg-white px-8 py-6 text-lg font-medium shadow-sm transition-colors hover:border-amber-500/50 hover:bg-amber-50 dark:border-white/10 dark:bg-zinc-900 dark:hover:border-amber-400/40 dark:hover:bg-amber-950/20"
             >
               {s.name}
             </button>
@@ -84,8 +86,8 @@ export default function LoginPage() {
         {Array.from({ length: 6 }).map((_, i) => (
           <span
             key={i}
-            className={`h-4 w-4 rounded-full border border-black/30 dark:border-white/30 ${
-              i < pin.length ? "bg-black dark:bg-white" : ""
+            className={`h-4 w-4 rounded-full border border-amber-500/40 dark:border-amber-400/40 ${
+              i < pin.length ? "bg-amber-500 dark:bg-amber-400" : ""
             }`}
           />
         ))}
@@ -97,7 +99,7 @@ export default function LoginPage() {
             key={d}
             onClick={() => pressDigit(d)}
             disabled={loading}
-            className="h-16 w-16 rounded-full border border-black/10 text-xl font-medium active:bg-zinc-100 dark:border-white/10 dark:active:bg-zinc-800"
+            className="h-16 w-16 rounded-full border border-black/10 text-xl font-medium active:border-amber-500/40 active:bg-amber-50 dark:border-white/10 dark:active:border-amber-400/30 dark:active:bg-amber-950/30"
           >
             {d}
           </button>
@@ -112,14 +114,14 @@ export default function LoginPage() {
         <button
           onClick={() => pressDigit("0")}
           disabled={loading}
-          className="h-16 w-16 rounded-full border border-black/10 text-xl font-medium active:bg-zinc-100 dark:border-white/10 dark:active:bg-zinc-800"
+          className="h-16 w-16 rounded-full border border-black/10 text-xl font-medium active:border-amber-500/40 active:bg-amber-50 dark:border-white/10 dark:active:border-amber-400/30 dark:active:bg-amber-950/30"
         >
           0
         </button>
         <button
           onClick={submit}
           disabled={loading || pin.length < 4}
-          className="h-16 w-16 rounded-full bg-black text-sm font-medium text-white disabled:opacity-30 dark:bg-white dark:text-black"
+          className="h-16 w-16 rounded-full bg-amber-600 text-sm font-medium text-white transition-colors hover:bg-amber-700 disabled:opacity-30 dark:bg-amber-500 dark:text-black dark:hover:bg-amber-400"
         >
           {loading ? "..." : "Go"}
         </button>

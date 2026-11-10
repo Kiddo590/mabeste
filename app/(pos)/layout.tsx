@@ -23,24 +23,24 @@ export default function PosLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex min-h-full flex-1 flex-col">
-      <nav className="flex items-center justify-between border-b border-black/10 px-4 py-3 dark:border-white/10">
+      <nav className="flex items-center justify-between border-b border-amber-500/20 px-4 py-3 dark:border-amber-400/15">
         <div className="flex items-center gap-4">
-          <span className="font-semibold">Mabeste POS</span>
-          <Link href="/tabs" className="text-sm hover:underline">
+          <span className="font-semibold text-amber-600 dark:text-amber-400">Mabeste POS</span>
+          <Link href="/tabs" className="text-sm hover:text-amber-600 hover:underline dark:hover:text-amber-400">
             Tabs
           </Link>
-          <Link href="/reports" className="text-sm hover:underline">
+          <Link href="/reports" className="text-sm hover:text-amber-600 hover:underline dark:hover:text-amber-400">
             Reports
           </Link>
           {session.staff_role === "admin" && (
             <>
-              <Link href="/admin/staff" className="text-sm hover:underline">
+              <Link href="/admin/staff" className="text-sm hover:text-amber-600 hover:underline dark:hover:text-amber-400">
                 Staff
               </Link>
-              <Link href="/admin/products" className="text-sm hover:underline">
+              <Link href="/admin/products" className="text-sm hover:text-amber-600 hover:underline dark:hover:text-amber-400">
                 Products
               </Link>
-              <Link href="/admin/inventory" className="text-sm hover:underline">
+              <Link href="/admin/inventory" className="text-sm hover:text-amber-600 hover:underline dark:hover:text-amber-400">
                 Inventory
               </Link>
             </>
@@ -50,7 +50,7 @@ export default function PosLayout({ children }: { children: React.ReactNode }) {
           <span className="text-zinc-500">
             {session.staff_name} &middot; {session.staff_role}
           </span>
-          <button onClick={logout} className="text-zinc-500 hover:underline">
+          <button onClick={logout} className="text-zinc-500 hover:text-amber-600 hover:underline dark:hover:text-amber-400">
             Log out
           </button>
         </div>

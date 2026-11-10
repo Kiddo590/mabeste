@@ -88,9 +88,13 @@ export default function AdminStaffPage() {
                 <td className="py-2">{s.name}</td>
                 <td className="py-2">{s.phone ?? "—"}</td>
                 <td className="py-2">{s.role}</td>
-                <td className="py-2">{s.is_active ? "Yes" : "No"}</td>
                 <td className="py-2">
-                  <button onClick={() => toggleActive(s)} className="text-zinc-500 hover:underline">
+                  <span className={s.is_active ? "text-emerald-600 dark:text-emerald-400" : "text-zinc-500"}>
+                    {s.is_active ? "Yes" : "No"}
+                  </span>
+                </td>
+                <td className="py-2">
+                  <button onClick={() => toggleActive(s)} className="text-amber-600 hover:underline dark:text-amber-400">
                     {s.is_active ? "Deactivate" : "Reactivate"}
                   </button>
                 </td>
@@ -108,13 +112,13 @@ export default function AdminStaffPage() {
             value={name}
             onChange={(e) => setName(e.target.value)}
             required
-            className="rounded border border-black/10 px-3 py-2 dark:border-white/10 dark:bg-zinc-900"
+            className="rounded border border-black/10 px-3 py-2 focus:border-amber-500/50 focus:outline-none dark:border-white/10 dark:bg-zinc-900 dark:focus:border-amber-400/40"
           />
           <input
             placeholder="Phone (optional)"
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
-            className="rounded border border-black/10 px-3 py-2 dark:border-white/10 dark:bg-zinc-900"
+            className="rounded border border-black/10 px-3 py-2 focus:border-amber-500/50 focus:outline-none dark:border-white/10 dark:bg-zinc-900 dark:focus:border-amber-400/40"
           />
           <input
             placeholder="PIN (4-6 digits)"
@@ -122,12 +126,12 @@ export default function AdminStaffPage() {
             onChange={(e) => setPin(e.target.value)}
             inputMode="numeric"
             required
-            className="rounded border border-black/10 px-3 py-2 dark:border-white/10 dark:bg-zinc-900"
+            className="rounded border border-black/10 px-3 py-2 focus:border-amber-500/50 focus:outline-none dark:border-white/10 dark:bg-zinc-900 dark:focus:border-amber-400/40"
           />
           <select
             value={role}
             onChange={(e) => setRole(e.target.value as "admin" | "cashier")}
-            className="rounded border border-black/10 px-3 py-2 dark:border-white/10 dark:bg-zinc-900"
+            className="rounded border border-black/10 px-3 py-2 focus:border-amber-500/50 focus:outline-none dark:border-white/10 dark:bg-zinc-900 dark:focus:border-amber-400/40"
           >
             <option value="cashier">Cashier</option>
             <option value="admin">Admin</option>
@@ -136,7 +140,7 @@ export default function AdminStaffPage() {
           <button
             type="submit"
             disabled={submitting}
-            className="rounded bg-black px-4 py-2 text-white disabled:opacity-50 dark:bg-white dark:text-black"
+            className="rounded bg-amber-600 px-4 py-2 text-white transition-colors hover:bg-amber-700 disabled:opacity-50 dark:bg-amber-500 dark:text-black dark:hover:bg-amber-400"
           >
             {submitting ? "Creating..." : "Create staff"}
           </button>
