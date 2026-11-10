@@ -52,6 +52,7 @@ export interface Database {
           low_stock_threshold: number;
           is_active: boolean;
           image_url: string | null;
+          size: string | null;
           created_at: string;
           updated_at: string;
         };

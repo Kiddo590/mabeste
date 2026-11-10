@@ -356,7 +356,10 @@ function TabDetailContent() {
               className="flex flex-col items-start gap-1 rounded-xl border border-black/10 p-3 text-left shadow-sm transition-shadow hover:shadow-md disabled:opacity-50 dark:border-white/10"
             >
               <span className="w-full truncate text-sm font-medium">{p.name}</span>
-              <span className="text-xs text-zinc-500">KES {p.price}</span>
+              <span className="text-xs text-zinc-500">
+                KES {p.price}
+                {p.size && ` · ${p.size}`}
+              </span>
             </button>
           ))}
         </div>

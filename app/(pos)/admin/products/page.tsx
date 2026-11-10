@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { getSupabaseClient } from "@/lib/supabase/client";
 import { uploadProductImage } from "@/lib/supabase/storage";
+import { fetchAllRows } from "@/lib/supabase/pagination";
 import type { Database } from "@/lib/supabase/types";
 import starterCatalogue from "@/lib/data/starter-catalogue.json";
 import { ImageUploadField } from "../../_components/ImageUploadField";
@@ -14,26 +15,6 @@ type CategoryRow = Database["public"]["Tables"]["categories"]["Row"];
 
 const STARTER_CATEGORY_NAMES = ["Beer", "Spirits", "Wine"] as const;
 const PAGE_SIZE = 60;
-const FETCH_PAGE_SIZE = 1000;
-
-// PostgREST caps an unbounded select() at this project's max_rows (1000) —
-// it silently truncates rather than erroring, so a single .select() call
-// only ever returns the first page once a table has more rows than that.
-// Page through with .range() to get everything.
-async function fetchAllRows<T>(
-  query: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>
-): Promise<T[]> {
-  let all: T[] = [];
-  let from = 0;
-  while (true) {
-    const { data, error } = await query(from, from + FETCH_PAGE_SIZE - 1);
-    if (error) throw new Error(error.message);
-    all = all.concat(data ?? []);
-    if (!data || data.length < FETCH_PAGE_SIZE) break;
-    from += FETCH_PAGE_SIZE;
-  }
-  return all;
-}
 
 function ProductThumb({ product, onReplace }: { product: ProductRow; onReplace: (url: string) => void }) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -116,6 +97,7 @@ function AdminProductsContent() {
   const [newPrice, setNewPrice] = useState("");
   const [newCategoryId, setNewCategoryId] = useState("");
   const [newImageUrl, setNewImageUrl] = useState("");
+  const [newSize, setNewSize] = useState("");
   const [adding, setAdding] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
 
@@ -159,27 +141,36 @@ function AdminProductsContent() {
         for (const c of inserted ?? []) categoryIdByName.set(c.name, c.id);
       }
 
-      const existingProducts = await fetchAllRows<{ id: string; name: string; image_url: string | null }>(
-        (from, to) => supabase.from("products").select("id, name, image_url").range(from, to)
-      );
+      const existingProducts = await fetchAllRows<{
+        id: string;
+        name: string;
+        image_url: string | null;
+        size: string | null;
+      }>((from, to) => supabase.from("products").select("id, name, image_url, size").range(from, to));
       // Matched by image_url (stable, one per catalogue entry) rather than
       // name — an earlier version of this catalogue had broken names for
       // items where the source API splits brand from a bare variant
       // descriptor (e.g. name "10", brand "Atlas"), so re-running this also
-      // repairs any previously-imported product whose name is now corrected.
+      // repairs any previously-imported product whose name or size is now
+      // corrected/added (e.g. the size column didn't exist at all until a
+      // later migration — every pre-existing row needs a one-time backfill).
       const existingByImage = new Map(existingProducts.filter((p) => p.image_url).map((p) => [p.image_url, p]));
 
-      const toInsert: { name: string; price: number; image_url: string; category_id: string | null }[] = [];
-      const toFix: { id: string; name: string }[] = [];
+      const toInsert: { name: string; price: number; image_url: string; size: string | null; category_id: string | null }[] = [];
+      const toFix: { id: string; name?: string; size?: string | null }[] = [];
       for (const item of starterCatalogue) {
         const existing = existingByImage.get(item.image_url);
         if (existing) {
-          if (existing.name !== item.name) toFix.push({ id: existing.id, name: item.name });
+          const patch: { name?: string; size?: string | null } = {};
+          if (existing.name !== item.name) patch.name = item.name;
+          if (existing.size !== (item.size ?? null)) patch.size = item.size ?? null;
+          if (Object.keys(patch).length > 0) toFix.push({ id: existing.id, ...patch });
         } else {
           toInsert.push({
             name: item.name,
             price: 0,
             image_url: item.image_url,
+            size: item.size ?? null,
             category_id: categoryIdByName.get(item.category) ?? null,
           });
         }
@@ -194,9 +185,24 @@ function AdminProductsContent() {
         const { error: insertError } = await supabase.from("products").insert(batch);
         if (insertError) throw new Error(insertError.message);
       }
-      for (const fix of toFix) {
-        const { error: fixError } = await supabase.from("products").update({ name: fix.name }).eq("id", fix.id);
-        if (fixError) throw new Error(fixError.message);
+      // A size backfill touches essentially every already-imported row the
+      // first time this runs post-migration — fan out in small concurrent
+      // batches rather than one request at a time, which would otherwise be
+      // a multi-thousand-request serial chain on a single click.
+      const FIX_CONCURRENCY = 20;
+      for (let i = 0; i < toFix.length; i += FIX_CONCURRENCY) {
+        const chunk = toFix.slice(i, i + FIX_CONCURRENCY);
+        await Promise.all(
+          chunk.map(({ id, ...patch }) =>
+            supabase
+              .from("products")
+              .update(patch)
+              .eq("id", id)
+              .then(({ error }) => {
+                if (error) throw new Error(error.message);
+              })
+          )
+        );
       }
 
       await loadAll();
@@ -252,12 +258,14 @@ function AdminProductsContent() {
         price,
         category_id: newCategoryId,
         image_url: newImageUrl.trim() || null,
+        size: newSize.trim() || null,
       });
       if (error) throw new Error(error.message);
       setNewName("");
       setNewPrice("");
       setNewCategoryId("");
       setNewImageUrl("");
+      setNewSize("");
       await loadAll();
     } catch (err) {
       setAddError(err instanceof Error ? err.message : "Failed to add product");
@@ -323,6 +331,12 @@ function AdminProductsContent() {
               </option>
             ))}
           </select>
+          <input
+            placeholder="Size (e.g. 750ml)"
+            value={newSize}
+            onChange={(e) => setNewSize(e.target.value)}
+            className="w-32 rounded border border-black/10 px-3 py-2 text-sm focus:border-brand-500/50 focus:outline-none dark:border-white/10 dark:bg-zinc-900 dark:focus:border-brand-400/40"
+          />
           <div className="flex items-center overflow-hidden rounded border border-black/10 focus-within:border-brand-500/50 dark:border-white/10 dark:focus-within:border-brand-400/40">
             <span className="bg-zinc-50 px-1.5 text-xs text-zinc-400 dark:bg-zinc-800">KES</span>
             <input
@@ -405,6 +419,7 @@ function AdminProductsContent() {
                 <ProductThumb product={p} onReplace={(url) => replaceProductImage(p.id, url)} />
                 <div className="flex min-w-0 flex-1 flex-col gap-1.5">
                   <span className="truncate text-sm font-medium">{p.name}</span>
+                  {p.size && <span className="text-xs text-zinc-500 dark:text-zinc-400">{p.size}</span>}
                   <span className="w-fit rounded-full bg-brand-100 px-2 py-0.5 text-[11px] font-medium text-brand-700 dark:bg-brand-900/40 dark:text-brand-300">
                     {categoryName(p.category_id)}
                   </span>
