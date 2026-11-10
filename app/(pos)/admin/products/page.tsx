@@ -136,22 +136,40 @@ function AdminProductsContent() {
 
       const { data: existingProducts, error: prodLoadError } = await supabase
         .from("products")
-        .select("name");
+        .select("id, name, image_url");
       if (prodLoadError) throw new Error(prodLoadError.message);
-      const existingNames = new Set((existingProducts ?? []).map((p) => p.name));
+      // Matched by image_url (stable, one per catalogue entry) rather than
+      // name — an earlier version of this catalogue had broken names for
+      // items where the source API splits brand from a bare variant
+      // descriptor (e.g. name "10", brand "Atlas"), so re-running this also
+      // repairs any previously-imported product whose name is now corrected.
+      const existingByImage = new Map(
+        (existingProducts ?? []).filter((p) => p.image_url).map((p) => [p.image_url, p])
+      );
 
-      const toInsert = starterCatalogue
-        .filter((item) => !existingNames.has(item.name))
-        .map((item) => ({
-          name: item.name,
-          price: 0,
-          image_url: item.image_url,
-          category_id: categoryIdByName.get(item.category) ?? null,
-        }));
+      const toInsert: { name: string; price: number; image_url: string; category_id: string | null }[] = [];
+      const toFix: { id: string; name: string }[] = [];
+      for (const item of starterCatalogue) {
+        const existing = existingByImage.get(item.image_url);
+        if (existing) {
+          if (existing.name !== item.name) toFix.push({ id: existing.id, name: item.name });
+        } else {
+          toInsert.push({
+            name: item.name,
+            price: 0,
+            image_url: item.image_url,
+            category_id: categoryIdByName.get(item.category) ?? null,
+          });
+        }
+      }
 
       if (toInsert.length > 0) {
         const { error: insertError } = await supabase.from("products").insert(toInsert);
         if (insertError) throw new Error(insertError.message);
+      }
+      for (const fix of toFix) {
+        const { error: fixError } = await supabase.from("products").update({ name: fix.name }).eq("id", fix.id);
+        if (fixError) throw new Error(fixError.message);
       }
 
       await loadAll();
