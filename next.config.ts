@@ -8,6 +8,11 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "chupachap.co.ke" },
       { protocol: "https", hostname: "ik.imagekit.io" },
       { protocol: "https", hostname: "jayswines.com" },
+      {
+        protocol: "https",
+        hostname: "fwpxrbgpjlhsqyqbpyqx.supabase.co",
+        pathname: "/storage/v1/object/public/**",
+      },
     ],
   },
   turbopack: {

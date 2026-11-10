@@ -1,15 +1,82 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { getSupabaseClient } from "@/lib/supabase/client";
+import { uploadProductImage } from "@/lib/supabase/storage";
 import type { Database } from "@/lib/supabase/types";
 import starterCatalogue from "@/lib/data/starter-catalogue.json";
+import { ImageUploadField } from "../../_components/ImageUploadField";
 
 type ProductRow = Database["public"]["Tables"]["products"]["Row"];
 type CategoryRow = Database["public"]["Tables"]["categories"]["Row"];
 
 const STARTER_CATEGORY_NAMES = ["Beer", "Spirits", "Wine"] as const;
+
+function ProductThumb({ product, onReplace }: { product: ProductRow; onReplace: (url: string) => void }) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+
+  async function handleFile(file: File | undefined) {
+    if (!file) return;
+    setUploading(true);
+    try {
+      const url = await uploadProductImage(file);
+      onReplace(url);
+    } catch {
+      // Lightweight inline affordance — on failure the thumbnail just stays
+      // as-is; the admin can try again.
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => inputRef.current?.click()}
+      className="group relative h-20 w-20 shrink-0 overflow-hidden rounded-xl bg-brand-50 dark:bg-brand-950/20"
+    >
+      {product.image_url ? (
+        <Image src={product.image_url} alt={product.name} fill sizes="80px" className="object-cover" />
+      ) : (
+        <span className="flex h-full w-full items-center justify-center">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={1.5}
+            className="h-8 w-8 text-brand-400 dark:text-brand-600"
+          >
+            <path
+              d="M9 2h6v4.5l2 3V20a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2V9.5l2-3V2Z"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+            <path d="M7 9.5h10" strokeLinecap="round" />
+          </svg>
+        </span>
+      )}
+      <span className="absolute inset-0 flex items-center justify-center bg-black/0 text-white opacity-0 transition-opacity group-hover:bg-black/40 group-hover:opacity-100">
+        {uploading ? (
+          <span className="text-[10px]">Uploading...</span>
+        ) : (
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} className="h-5 w-5">
+            <path d="M12 16V4M12 4l-4 4M12 4l4 4" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        )}
+      </span>
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/png,image/jpeg,image/webp"
+        className="hidden"
+        onChange={(e) => handleFile(e.target.files?.[0])}
+      />
+    </button>
+  );
+}
 
 export default function AdminProductsPage() {
   const [products, setProducts] = useState<ProductRow[]>([]);
@@ -115,6 +182,11 @@ export default function AdminProductsPage() {
     if (!error) loadAll();
   }
 
+  async function replaceProductImage(id: string, url: string | null) {
+    const { error } = await getSupabaseClient().from("products").update({ image_url: url }).eq("id", id);
+    if (!error) loadAll();
+  }
+
   async function addProduct(e: React.FormEvent) {
     e.preventDefault();
     setAddError(null);
@@ -210,6 +282,7 @@ export default function AdminProductsPage() {
               className="w-20 appearance-none px-2 py-2 text-sm outline-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none dark:bg-zinc-900"
             />
           </div>
+          <ImageUploadField value={newImageUrl || null} onChange={(url) => setNewImageUrl(url ?? "")} />
           <button
             type="submit"
             disabled={adding}
@@ -257,28 +330,7 @@ export default function AdminProductsPage() {
                   p.is_active ? "" : "opacity-50"
                 }`}
               >
-                <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-xl bg-brand-50 dark:bg-brand-950/20">
-                  {p.image_url ? (
-                    <Image src={p.image_url} alt={p.name} fill sizes="80px" className="object-cover" />
-                  ) : (
-                    <span className="flex h-full w-full items-center justify-center">
-                      <svg
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth={1.5}
-                        className="h-8 w-8 text-brand-400 dark:text-brand-600"
-                      >
-                        <path
-                          d="M9 2h6v4.5l2 3V20a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2V9.5l2-3V2Z"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        />
-                        <path d="M7 9.5h10" strokeLinecap="round" />
-                      </svg>
-                    </span>
-                  )}
-                </div>
+                <ProductThumb product={p} onReplace={(url) => replaceProductImage(p.id, url)} />
                 <div className="flex min-w-0 flex-1 flex-col gap-1.5">
                   <span className="truncate text-sm font-medium">{p.name}</span>
                   <span className="w-fit rounded-full bg-brand-100 px-2 py-0.5 text-[11px] font-medium text-brand-700 dark:bg-brand-900/40 dark:text-brand-300">
