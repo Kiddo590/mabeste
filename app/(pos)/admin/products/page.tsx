@@ -19,6 +19,14 @@ export default function AdminProductsPage() {
   const [importError, setImportError] = useState<string | null>(null);
   const [priceDrafts, setPriceDrafts] = useState<Record<string, string>>({});
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+
+  const [newName, setNewName] = useState("");
+  const [newPrice, setNewPrice] = useState("");
+  const [newCategoryId, setNewCategoryId] = useState("");
+  const [newImageUrl, setNewImageUrl] = useState("");
+  const [adding, setAdding] = useState(false);
+  const [addError, setAddError] = useState<string | null>(null);
 
   async function loadAll() {
     const supabase = getSupabaseClient();
@@ -107,7 +115,43 @@ export default function AdminProductsPage() {
     if (!error) loadAll();
   }
 
+  async function addProduct(e: React.FormEvent) {
+    e.preventDefault();
+    setAddError(null);
+    if (!newName.trim() || !newCategoryId) {
+      setAddError("Name and category are required");
+      return;
+    }
+    const price = newPrice ? Number(newPrice) : 0;
+    if (Number.isNaN(price) || price < 0) {
+      setAddError("Price must be a positive number");
+      return;
+    }
+    setAdding(true);
+    try {
+      const { error } = await getSupabaseClient().from("products").insert({
+        name: newName.trim(),
+        price,
+        category_id: newCategoryId,
+        image_url: newImageUrl.trim() || null,
+      });
+      if (error) throw new Error(error.message);
+      setNewName("");
+      setNewPrice("");
+      setNewCategoryId("");
+      setNewImageUrl("");
+      await loadAll();
+    } catch (err) {
+      setAddError(err instanceof Error ? err.message : "Failed to add product");
+    } finally {
+      setAdding(false);
+    }
+  }
+
   const categoryName = (id: string | null) => categories.find((c) => c.id === id)?.name ?? "—";
+  const visibleProducts = search.trim()
+    ? products.filter((p) => p.name.toLowerCase().includes(search.trim().toLowerCase()))
+    : products;
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-6">
@@ -133,10 +177,86 @@ export default function AdminProductsPage() {
         {loadError && <p className="mt-3 text-red-600">{loadError}</p>}
       </section>
 
+      <section className="rounded-2xl border border-black/10 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-zinc-900">
+        <h2 className="mb-4 text-lg font-semibold">Add a product</h2>
+        <form onSubmit={addProduct} className="flex flex-wrap items-start gap-3">
+          <input
+            placeholder="Name"
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            className="min-w-0 flex-1 rounded border border-black/10 px-3 py-2 text-sm focus:border-amber-500/50 focus:outline-none dark:border-white/10 dark:bg-zinc-900 dark:focus:border-amber-400/40"
+          />
+          <select
+            value={newCategoryId}
+            onChange={(e) => setNewCategoryId(e.target.value)}
+            className="rounded border border-black/10 px-3 py-2 text-sm focus:border-amber-500/50 focus:outline-none dark:border-white/10 dark:bg-zinc-900 dark:focus:border-amber-400/40"
+          >
+            <option value="">Category</option>
+            {categories.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+          <div className="flex items-center overflow-hidden rounded border border-black/10 focus-within:border-amber-500/50 dark:border-white/10 dark:focus-within:border-amber-400/40">
+            <span className="bg-zinc-50 px-1.5 text-xs text-zinc-400 dark:bg-zinc-800">KES</span>
+            <input
+              type="number"
+              min={0}
+              step="0.01"
+              placeholder="0"
+              value={newPrice}
+              onChange={(e) => setNewPrice(e.target.value)}
+              className="w-20 appearance-none px-2 py-2 text-sm outline-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none dark:bg-zinc-900"
+            />
+          </div>
+          <input
+            placeholder="Image URL (optional)"
+            value={newImageUrl}
+            onChange={(e) => setNewImageUrl(e.target.value)}
+            className="min-w-0 flex-1 rounded border border-black/10 px-3 py-2 text-sm focus:border-amber-500/50 focus:outline-none dark:border-white/10 dark:bg-zinc-900 dark:focus:border-amber-400/40"
+          />
+          <button
+            type="submit"
+            disabled={adding}
+            className="rounded bg-amber-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-amber-700 disabled:opacity-50 dark:bg-amber-500 dark:text-black dark:hover:bg-amber-400"
+          >
+            {adding ? "Adding..." : "Add product"}
+          </button>
+        </form>
+        {addError && <p className="mt-3 text-red-600">{addError}</p>}
+      </section>
+
       {products.length > 0 && (
         <section className="rounded-2xl border border-black/10 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-zinc-900">
+          <div className="mb-4 flex items-center gap-2 rounded border border-black/10 px-3 py-2 focus-within:border-amber-500/50 dark:border-white/10 dark:focus-within:border-amber-400/40">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={1.5}
+              className="h-4 w-4 shrink-0 text-zinc-400"
+            >
+              <circle cx="11" cy="11" r="7" />
+              <path d="m20 20-3-3" strokeLinecap="round" />
+            </svg>
+            <input
+              placeholder="Search products by name..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full bg-transparent text-sm outline-none"
+            />
+            {search && (
+              <span className="shrink-0 text-xs text-zinc-400">
+                {visibleProducts.length} of {products.length}
+              </span>
+            )}
+          </div>
+          {visibleProducts.length === 0 && (
+            <p className="text-sm text-zinc-500">No products match &ldquo;{search}&rdquo;.</p>
+          )}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {products.map((p) => (
+            {visibleProducts.map((p) => (
               <div
                 key={p.id}
                 className={`flex gap-3 rounded-2xl border border-black/10 p-3 shadow-sm transition-shadow hover:shadow-md dark:border-white/10 ${
