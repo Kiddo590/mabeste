@@ -12,6 +12,34 @@
   --font-mono: var(--font-geist-mono);
 }
 
+@theme {
+  /* Brand (blue) — navigation, structure, headers, focus chrome, badges */
+  --color-brand-50: #eff6ff;
+  --color-brand-100: #dbeafe;
+  --color-brand-200: #bfdbfe;
+  --color-brand-300: #93c5fd;
+  --color-brand-400: #60a5fa;
+  --color-brand-500: #3b82f6;
+  --color-brand-600: #2563eb;
+  --color-brand-700: #1d4ed8;
+  --color-brand-800: #1e40af;
+  --color-brand-900: #1e3a8a;
+  --color-brand-950: #172554;
+
+  /* Gold (accent) — committing buttons / CTAs */
+  --color-gold-50: #fdf8ec;
+  --color-gold-100: #faeecb;
+  --color-gold-200: #f3dd9a;
+  --color-gold-300: #eac766;
+  --color-gold-400: #dfae3f;
+  --color-gold-500: #c89328;
+  --color-gold-600: #a8771f;
+  --color-gold-700: #8a5f1b;
+  --color-gold-800: #714c1c;
+  --color-gold-900: #5f3f1c;
+  --color-gold-950: #36210d;
+}
+
 @media (prefers-color-scheme: dark) {
   :root {
     --background: #0a0a0a;

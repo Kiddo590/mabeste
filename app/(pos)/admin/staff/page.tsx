@@ -72,29 +72,30 @@ export default function AdminStaffPage() {
       <section className="rounded-2xl border border-black/10 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-zinc-900">
         <h1 className="mb-4 text-lg font-semibold">Staff</h1>
         {loadError && <p className="text-red-600">{loadError}</p>}
-        <table className="w-full max-w-2xl text-left text-sm">
+        <div className="overflow-x-auto">
+        <table className="w-full max-w-2xl text-left text-sm whitespace-nowrap">
           <thead>
             <tr className="border-b border-black/10 dark:border-white/10">
-              <th className="py-2">Name</th>
-              <th className="py-2">Phone</th>
-              <th className="py-2">Role</th>
-              <th className="py-2">Active</th>
+              <th className="py-2 pr-4">Name</th>
+              <th className="py-2 pr-4">Phone</th>
+              <th className="py-2 pr-4">Role</th>
+              <th className="py-2 pr-4">Active</th>
               <th className="py-2" />
             </tr>
           </thead>
           <tbody>
             {staff.map((s) => (
               <tr key={s.id} className="border-b border-black/5 dark:border-white/5">
-                <td className="py-2">{s.name}</td>
-                <td className="py-2">{s.phone ?? "—"}</td>
-                <td className="py-2">{s.role}</td>
-                <td className="py-2">
+                <td className="py-2 pr-4">{s.name}</td>
+                <td className="py-2 pr-4">{s.phone ?? "—"}</td>
+                <td className="py-2 pr-4">{s.role}</td>
+                <td className="py-2 pr-4">
                   <span className={s.is_active ? "text-emerald-600 dark:text-emerald-400" : "text-zinc-500"}>
                     {s.is_active ? "Yes" : "No"}
                   </span>
                 </td>
                 <td className="py-2">
-                  <button onClick={() => toggleActive(s)} className="text-amber-600 hover:underline dark:text-amber-400">
+                  <button onClick={() => toggleActive(s)} className="text-gold-600 hover:underline dark:text-gold-400">
                     {s.is_active ? "Deactivate" : "Reactivate"}
                   </button>
                 </td>
@@ -102,6 +103,7 @@ export default function AdminStaffPage() {
             ))}
           </tbody>
         </table>
+        </div>
       </section>
 
       <section className="max-w-sm rounded-2xl border border-black/10 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-zinc-900">
@@ -112,13 +114,13 @@ export default function AdminStaffPage() {
             value={name}
             onChange={(e) => setName(e.target.value)}
             required
-            className="rounded border border-black/10 px-3 py-2 focus:border-amber-500/50 focus:outline-none dark:border-white/10 dark:bg-zinc-900 dark:focus:border-amber-400/40"
+            className="rounded border border-black/10 px-3 py-2 focus:border-brand-500/50 focus:outline-none dark:border-white/10 dark:bg-zinc-900 dark:focus:border-brand-400/40"
           />
           <input
             placeholder="Phone (optional)"
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
-            className="rounded border border-black/10 px-3 py-2 focus:border-amber-500/50 focus:outline-none dark:border-white/10 dark:bg-zinc-900 dark:focus:border-amber-400/40"
+            className="rounded border border-black/10 px-3 py-2 focus:border-brand-500/50 focus:outline-none dark:border-white/10 dark:bg-zinc-900 dark:focus:border-brand-400/40"
           />
           <input
             placeholder="PIN (4-6 digits)"
@@ -126,12 +128,12 @@ export default function AdminStaffPage() {
             onChange={(e) => setPin(e.target.value)}
             inputMode="numeric"
             required
-            className="rounded border border-black/10 px-3 py-2 focus:border-amber-500/50 focus:outline-none dark:border-white/10 dark:bg-zinc-900 dark:focus:border-amber-400/40"
+            className="rounded border border-black/10 px-3 py-2 focus:border-brand-500/50 focus:outline-none dark:border-white/10 dark:bg-zinc-900 dark:focus:border-brand-400/40"
           />
           <select
             value={role}
             onChange={(e) => setRole(e.target.value as "admin" | "cashier")}
-            className="rounded border border-black/10 px-3 py-2 focus:border-amber-500/50 focus:outline-none dark:border-white/10 dark:bg-zinc-900 dark:focus:border-amber-400/40"
+            className="rounded border border-black/10 px-3 py-2 focus:border-brand-500/50 focus:outline-none dark:border-white/10 dark:bg-zinc-900 dark:focus:border-brand-400/40"
           >
             <option value="cashier">Cashier</option>
             <option value="admin">Admin</option>
@@ -140,7 +142,7 @@ export default function AdminStaffPage() {
           <button
             type="submit"
             disabled={submitting}
-            className="rounded bg-amber-600 px-4 py-2 text-white transition-colors hover:bg-amber-700 disabled:opacity-50 dark:bg-amber-500 dark:text-black dark:hover:bg-amber-400"
+            className="rounded bg-gold-600 px-4 py-2 text-white transition-colors hover:bg-gold-700 disabled:opacity-50 dark:bg-gold-500 dark:text-black dark:hover:bg-gold-400"
           >
             {submitting ? "Creating..." : "Create staff"}
           </button>

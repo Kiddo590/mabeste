@@ -168,7 +168,7 @@ export default function AdminProductsPage() {
           <button
             onClick={importStarterCatalogue}
             disabled={importing}
-            className="rounded bg-amber-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-amber-700 disabled:opacity-50 dark:bg-amber-500 dark:text-black dark:hover:bg-amber-400"
+            className="rounded bg-gold-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-gold-700 disabled:opacity-50 dark:bg-gold-500 dark:text-black dark:hover:bg-gold-400"
           >
             {importing ? "Loading catalogue..." : "Load starter catalogue"}
           </button>
@@ -184,12 +184,12 @@ export default function AdminProductsPage() {
             placeholder="Name"
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
-            className="min-w-0 flex-1 rounded border border-black/10 px-3 py-2 text-sm focus:border-amber-500/50 focus:outline-none dark:border-white/10 dark:bg-zinc-900 dark:focus:border-amber-400/40"
+            className="min-w-0 flex-1 rounded border border-black/10 px-3 py-2 text-sm focus:border-brand-500/50 focus:outline-none dark:border-white/10 dark:bg-zinc-900 dark:focus:border-brand-400/40"
           />
           <select
             value={newCategoryId}
             onChange={(e) => setNewCategoryId(e.target.value)}
-            className="rounded border border-black/10 px-3 py-2 text-sm focus:border-amber-500/50 focus:outline-none dark:border-white/10 dark:bg-zinc-900 dark:focus:border-amber-400/40"
+            className="rounded border border-black/10 px-3 py-2 text-sm focus:border-brand-500/50 focus:outline-none dark:border-white/10 dark:bg-zinc-900 dark:focus:border-brand-400/40"
           >
             <option value="">Category</option>
             {categories.map((c) => (
@@ -198,7 +198,7 @@ export default function AdminProductsPage() {
               </option>
             ))}
           </select>
-          <div className="flex items-center overflow-hidden rounded border border-black/10 focus-within:border-amber-500/50 dark:border-white/10 dark:focus-within:border-amber-400/40">
+          <div className="flex items-center overflow-hidden rounded border border-black/10 focus-within:border-brand-500/50 dark:border-white/10 dark:focus-within:border-brand-400/40">
             <span className="bg-zinc-50 px-1.5 text-xs text-zinc-400 dark:bg-zinc-800">KES</span>
             <input
               type="number"
@@ -210,16 +210,10 @@ export default function AdminProductsPage() {
               className="w-20 appearance-none px-2 py-2 text-sm outline-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none dark:bg-zinc-900"
             />
           </div>
-          <input
-            placeholder="Image URL (optional)"
-            value={newImageUrl}
-            onChange={(e) => setNewImageUrl(e.target.value)}
-            className="min-w-0 flex-1 rounded border border-black/10 px-3 py-2 text-sm focus:border-amber-500/50 focus:outline-none dark:border-white/10 dark:bg-zinc-900 dark:focus:border-amber-400/40"
-          />
           <button
             type="submit"
             disabled={adding}
-            className="rounded bg-amber-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-amber-700 disabled:opacity-50 dark:bg-amber-500 dark:text-black dark:hover:bg-amber-400"
+            className="rounded bg-gold-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-gold-700 disabled:opacity-50 dark:bg-gold-500 dark:text-black dark:hover:bg-gold-400"
           >
             {adding ? "Adding..." : "Add product"}
           </button>
@@ -229,7 +223,7 @@ export default function AdminProductsPage() {
 
       {products.length > 0 && (
         <section className="rounded-2xl border border-black/10 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-zinc-900">
-          <div className="mb-4 flex items-center gap-2 rounded border border-black/10 px-3 py-2 focus-within:border-amber-500/50 dark:border-white/10 dark:focus-within:border-amber-400/40">
+          <div className="mb-4 flex items-center gap-2 rounded border border-black/10 px-3 py-2 focus-within:border-brand-500/50 dark:border-white/10 dark:focus-within:border-brand-400/40">
             <svg
               viewBox="0 0 24 24"
               fill="none"
@@ -263,7 +257,7 @@ export default function AdminProductsPage() {
                   p.is_active ? "" : "opacity-50"
                 }`}
               >
-                <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-xl bg-amber-50 dark:bg-amber-950/20">
+                <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-xl bg-brand-50 dark:bg-brand-950/20">
                   {p.image_url ? (
                     <Image src={p.image_url} alt={p.name} fill sizes="80px" className="object-cover" />
                   ) : (
@@ -273,7 +267,7 @@ export default function AdminProductsPage() {
                         fill="none"
                         stroke="currentColor"
                         strokeWidth={1.5}
-                        className="h-8 w-8 text-amber-400 dark:text-amber-600"
+                        className="h-8 w-8 text-brand-400 dark:text-brand-600"
                       >
                         <path
                           d="M9 2h6v4.5l2 3V20a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2V9.5l2-3V2Z"
@@ -287,11 +281,11 @@ export default function AdminProductsPage() {
                 </div>
                 <div className="flex min-w-0 flex-1 flex-col gap-1.5">
                   <span className="truncate text-sm font-medium">{p.name}</span>
-                  <span className="w-fit rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
+                  <span className="w-fit rounded-full bg-brand-100 px-2 py-0.5 text-[11px] font-medium text-brand-700 dark:bg-brand-900/40 dark:text-brand-300">
                     {categoryName(p.category_id)}
                   </span>
                   <div className="mt-auto flex flex-wrap items-center gap-2">
-                    <div className="flex items-center overflow-hidden rounded border border-black/10 focus-within:border-amber-500/50 dark:border-white/10 dark:focus-within:border-amber-400/40">
+                    <div className="flex items-center overflow-hidden rounded border border-black/10 focus-within:border-brand-500/50 dark:border-white/10 dark:focus-within:border-brand-400/40">
                       <span className="bg-zinc-50 px-1.5 text-xs text-zinc-400 dark:bg-zinc-800">KES</span>
                       <input
                         type="number"
@@ -305,13 +299,13 @@ export default function AdminProductsPage() {
                     <button
                       onClick={() => savePrice(p.id)}
                       disabled={savingId === p.id}
-                      className="rounded bg-amber-600 px-2 py-1 text-xs font-medium text-white hover:bg-amber-700 disabled:opacity-50 dark:bg-amber-500 dark:text-black dark:hover:bg-amber-400"
+                      className="rounded bg-gold-600 px-2 py-1 text-xs font-medium text-white hover:bg-gold-700 disabled:opacity-50 dark:bg-gold-500 dark:text-black dark:hover:bg-gold-400"
                     >
                       Save
                     </button>
                     <button
                       onClick={() => toggleActive(p)}
-                      className="ml-auto text-xs text-zinc-500 hover:text-amber-600 dark:hover:text-amber-400"
+                      className="ml-auto text-xs text-zinc-500 hover:text-gold-600 dark:hover:text-gold-400"
                     >
                       {p.is_active ? "Deactivate" : "Reactivate"}
                     </button>
