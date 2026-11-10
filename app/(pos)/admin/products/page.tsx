@@ -7,6 +7,7 @@ import { uploadProductImage } from "@/lib/supabase/storage";
 import type { Database } from "@/lib/supabase/types";
 import starterCatalogue from "@/lib/data/starter-catalogue.json";
 import { ImageUploadField } from "../../_components/ImageUploadField";
+import { RequireAdmin } from "../../_components/RequireAdmin";
 
 type ProductRow = Database["public"]["Tables"]["products"]["Row"];
 type CategoryRow = Database["public"]["Tables"]["categories"]["Row"];
@@ -78,7 +79,7 @@ function ProductThumb({ product, onReplace }: { product: ProductRow; onReplace: 
   );
 }
 
-export default function AdminProductsPage() {
+function AdminProductsContent() {
   const [products, setProducts] = useState<ProductRow[]>([]);
   const [categories, setCategories] = useState<CategoryRow[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -369,5 +370,13 @@ export default function AdminProductsPage() {
         </section>
       )}
     </div>
+  );
+}
+
+export default function AdminProductsPage() {
+  return (
+    <RequireAdmin>
+      <AdminProductsContent />
+    </RequireAdmin>
   );
 }

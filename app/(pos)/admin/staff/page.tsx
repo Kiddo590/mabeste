@@ -3,11 +3,12 @@
 import { useEffect, useState } from "react";
 import { getSupabaseClient } from "@/lib/supabase/client";
 import { createStaff } from "@/lib/auth/pin";
+import { RequireAdmin } from "../../_components/RequireAdmin";
 import type { Database } from "@/lib/supabase/types";
 
 type StaffRow = Database["public"]["Tables"]["staff"]["Row"];
 
-export default function AdminStaffPage() {
+function AdminStaffContent() {
   const [staff, setStaff] = useState<StaffRow[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [name, setName] = useState("");
@@ -149,5 +150,13 @@ export default function AdminStaffPage() {
         </form>
       </section>
     </div>
+  );
+}
+
+export default function AdminStaffPage() {
+  return (
+    <RequireAdmin>
+      <AdminStaffContent />
+    </RequireAdmin>
   );
 }
