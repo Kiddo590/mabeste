@@ -135,31 +135,53 @@ export default function AdminProductsPage() {
 
       {products.length > 0 && (
         <section className="rounded-2xl border border-black/10 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-zinc-900">
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {products.map((p) => (
               <div
                 key={p.id}
-                className={`flex gap-3 rounded-xl border border-black/10 p-3 dark:border-white/10 ${
+                className={`flex gap-3 rounded-2xl border border-black/10 p-3 shadow-sm transition-shadow hover:shadow-md dark:border-white/10 ${
                   p.is_active ? "" : "opacity-50"
                 }`}
               >
-                <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-zinc-100 dark:bg-zinc-800">
-                  {p.image_url && (
-                    <Image src={p.image_url} alt={p.name} fill sizes="64px" className="object-cover" />
+                <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-xl bg-amber-50 dark:bg-amber-950/20">
+                  {p.image_url ? (
+                    <Image src={p.image_url} alt={p.name} fill sizes="80px" className="object-cover" />
+                  ) : (
+                    <span className="flex h-full w-full items-center justify-center">
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth={1.5}
+                        className="h-8 w-8 text-amber-400 dark:text-amber-600"
+                      >
+                        <path
+                          d="M9 2h6v4.5l2 3V20a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2V9.5l2-3V2Z"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                        <path d="M7 9.5h10" strokeLinecap="round" />
+                      </svg>
+                    </span>
                   )}
                 </div>
-                <div className="flex min-w-0 flex-1 flex-col gap-1">
+                <div className="flex min-w-0 flex-1 flex-col gap-1.5">
                   <span className="truncate text-sm font-medium">{p.name}</span>
-                  <span className="text-xs text-zinc-500">{categoryName(p.category_id)}</span>
-                  <div className="mt-auto flex items-center gap-2">
-                    <input
-                      type="number"
-                      min={0}
-                      step="0.01"
-                      value={priceDrafts[p.id] ?? String(p.price)}
-                      onChange={(e) => setPriceDrafts((d) => ({ ...d, [p.id]: e.target.value }))}
-                      className="w-20 rounded border border-black/10 px-2 py-1 text-sm focus:border-amber-500/50 focus:outline-none dark:border-white/10 dark:bg-zinc-900 dark:focus:border-amber-400/40"
-                    />
+                  <span className="w-fit rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
+                    {categoryName(p.category_id)}
+                  </span>
+                  <div className="mt-auto flex flex-wrap items-center gap-2">
+                    <div className="flex items-center overflow-hidden rounded border border-black/10 focus-within:border-amber-500/50 dark:border-white/10 dark:focus-within:border-amber-400/40">
+                      <span className="bg-zinc-50 px-1.5 text-xs text-zinc-400 dark:bg-zinc-800">KES</span>
+                      <input
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        value={priceDrafts[p.id] ?? String(p.price)}
+                        onChange={(e) => setPriceDrafts((d) => ({ ...d, [p.id]: e.target.value }))}
+                        className="w-24 appearance-none px-2 py-1 text-sm outline-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none dark:bg-zinc-900"
+                      />
+                    </div>
                     <button
                       onClick={() => savePrice(p.id)}
                       disabled={savingId === p.id}
