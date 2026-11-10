@@ -13,6 +13,7 @@ type ProductRow = Database["public"]["Tables"]["products"]["Row"];
 type CategoryRow = Database["public"]["Tables"]["categories"]["Row"];
 
 const STARTER_CATEGORY_NAMES = ["Beer", "Spirits", "Wine"] as const;
+const PAGE_SIZE = 60;
 
 function ProductThumb({ product, onReplace }: { product: ProductRow; onReplace: (url: string) => void }) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -88,6 +89,8 @@ function AdminProductsContent() {
   const [priceDrafts, setPriceDrafts] = useState<Record<string, string>>({});
   const [savingId, setSavingId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
   const [newName, setNewName] = useState("");
   const [newPrice, setNewPrice] = useState("");
@@ -163,8 +166,13 @@ function AdminProductsContent() {
         }
       }
 
-      if (toInsert.length > 0) {
-        const { error: insertError } = await supabase.from("products").insert(toInsert);
+      // The full catalogue can mean thousands of new rows — insert in
+      // batches rather than one request, to stay well under any payload or
+      // statement-timeout limit.
+      const INSERT_BATCH_SIZE = 500;
+      for (let i = 0; i < toInsert.length; i += INSERT_BATCH_SIZE) {
+        const batch = toInsert.slice(i, i + INSERT_BATCH_SIZE);
+        const { error: insertError } = await supabase.from("products").insert(batch);
         if (insertError) throw new Error(insertError.message);
       }
       for (const fix of toFix) {
@@ -240,9 +248,16 @@ function AdminProductsContent() {
   }
 
   const categoryName = (id: string | null) => categories.find((c) => c.id === id)?.name ?? "—";
-  const visibleProducts = search.trim()
-    ? products.filter((p) => p.name.toLowerCase().includes(search.trim().toLowerCase()))
-    : products;
+  const filteredProducts = products.filter((p) => {
+    if (categoryFilter && p.category_id !== categoryFilter) return false;
+    if (search.trim() && !p.name.toLowerCase().includes(search.trim().toLowerCase())) return false;
+    return true;
+  });
+  const visibleProducts = filteredProducts.slice(0, visibleCount);
+
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+  }, [search, categoryFilter]);
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-6">
@@ -315,6 +330,27 @@ function AdminProductsContent() {
 
       {products.length > 0 && (
         <section className="rounded-2xl border border-black/10 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-zinc-900">
+          <div className="mb-3 flex flex-wrap gap-2">
+            <button
+              onClick={() => setCategoryFilter(null)}
+              className={`rounded-full px-3 py-1 text-xs font-medium ${
+                !categoryFilter ? "bg-brand-600 text-white" : "bg-zinc-100 text-zinc-600 dark:bg-zinc-800"
+              }`}
+            >
+              All
+            </button>
+            {categories.map((c) => (
+              <button
+                key={c.id}
+                onClick={() => setCategoryFilter(c.id)}
+                className={`rounded-full px-3 py-1 text-xs font-medium ${
+                  categoryFilter === c.id ? "bg-brand-600 text-white" : "bg-zinc-100 text-zinc-600 dark:bg-zinc-800"
+                }`}
+              >
+                {c.name}
+              </button>
+            ))}
+          </div>
           <div className="mb-4 flex items-center gap-2 rounded border border-black/10 px-3 py-2 focus-within:border-brand-500/50 dark:border-white/10 dark:focus-within:border-brand-400/40">
             <svg
               viewBox="0 0 24 24"
@@ -332,14 +368,12 @@ function AdminProductsContent() {
               onChange={(e) => setSearch(e.target.value)}
               className="w-full bg-transparent text-sm outline-none"
             />
-            {search && (
-              <span className="shrink-0 text-xs text-zinc-400">
-                {visibleProducts.length} of {products.length}
-              </span>
-            )}
+            <span className="shrink-0 text-xs text-zinc-400">
+              {filteredProducts.length} of {products.length}
+            </span>
           </div>
-          {visibleProducts.length === 0 && (
-            <p className="text-sm text-zinc-500">No products match &ldquo;{search}&rdquo;.</p>
+          {filteredProducts.length === 0 && (
+            <p className="text-sm text-zinc-500">No products match this filter.</p>
           )}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {visibleProducts.map((p) => (
@@ -385,6 +419,14 @@ function AdminProductsContent() {
               </div>
             ))}
           </div>
+          {visibleCount < filteredProducts.length && (
+            <button
+              onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}
+              className="mt-4 w-full rounded border border-black/10 py-2 text-sm text-zinc-600 hover:border-brand-500/50 hover:text-brand-600 dark:border-white/10 dark:text-zinc-400 dark:hover:border-brand-400/40 dark:hover:text-brand-400"
+            >
+              Load more ({filteredProducts.length - visibleCount} remaining)
+            </button>
+          )}
         </section>
       )}
     </div>
