@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { useStaffSession } from "@/lib/auth/useStaffSession";
@@ -69,7 +69,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/admin/inventory", label: "Inventory", adminOnly: true, icon: InventoryIcon },
 ];
 
-export default function PosLayout({ children }: { children: React.ReactNode }) {
+function PosLayoutInner({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const session = useStaffSession();
@@ -150,5 +150,13 @@ export default function PosLayout({ children }: { children: React.ReactNode }) {
         })}
       </nav>
     </div>
+  );
+}
+
+export default function PosLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <Suspense fallback={null}>
+      <PosLayoutInner>{children}</PosLayoutInner>
+    </Suspense>
   );
 }
