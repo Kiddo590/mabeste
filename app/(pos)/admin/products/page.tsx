@@ -14,6 +14,26 @@ type CategoryRow = Database["public"]["Tables"]["categories"]["Row"];
 
 const STARTER_CATEGORY_NAMES = ["Beer", "Spirits", "Wine"] as const;
 const PAGE_SIZE = 60;
+const FETCH_PAGE_SIZE = 1000;
+
+// PostgREST caps an unbounded select() at this project's max_rows (1000) —
+// it silently truncates rather than erroring, so a single .select() call
+// only ever returns the first page once a table has more rows than that.
+// Page through with .range() to get everything.
+async function fetchAllRows<T>(
+  query: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>
+): Promise<T[]> {
+  let all: T[] = [];
+  let from = 0;
+  while (true) {
+    const { data, error } = await query(from, from + FETCH_PAGE_SIZE - 1);
+    if (error) throw new Error(error.message);
+    all = all.concat(data ?? []);
+    if (!data || data.length < FETCH_PAGE_SIZE) break;
+    from += FETCH_PAGE_SIZE;
+  }
+  return all;
+}
 
 function ProductThumb({ product, onReplace }: { product: ProductRow; onReplace: (url: string) => void }) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -101,16 +121,18 @@ function AdminProductsContent() {
 
   async function loadAll() {
     const supabase = getSupabaseClient();
-    const [{ data: cats, error: catError }, { data: prods, error: prodError }] = await Promise.all([
-      supabase.from("categories").select("*").order("sort_order"),
-      supabase.from("products").select("*").order("name"),
-    ]);
-    if (catError || prodError) {
-      setLoadError(catError?.message ?? prodError?.message ?? "Failed to load products");
-      return;
+    try {
+      const [cats, prods] = await Promise.all([
+        fetchAllRows<CategoryRow>((from, to) =>
+          supabase.from("categories").select("*").order("sort_order").range(from, to)
+        ),
+        fetchAllRows<ProductRow>((from, to) => supabase.from("products").select("*").order("name").range(from, to)),
+      ]);
+      setCategories(cats);
+      setProducts(prods);
+    } catch (err) {
+      setLoadError(err instanceof Error ? err.message : "Failed to load products");
     }
-    setCategories(cats ?? []);
-    setProducts(prods ?? []);
   }
 
   useEffect(() => {
@@ -137,18 +159,15 @@ function AdminProductsContent() {
         for (const c of inserted ?? []) categoryIdByName.set(c.name, c.id);
       }
 
-      const { data: existingProducts, error: prodLoadError } = await supabase
-        .from("products")
-        .select("id, name, image_url");
-      if (prodLoadError) throw new Error(prodLoadError.message);
+      const existingProducts = await fetchAllRows<{ id: string; name: string; image_url: string | null }>(
+        (from, to) => supabase.from("products").select("id, name, image_url").range(from, to)
+      );
       // Matched by image_url (stable, one per catalogue entry) rather than
       // name — an earlier version of this catalogue had broken names for
       // items where the source API splits brand from a bare variant
       // descriptor (e.g. name "10", brand "Atlas"), so re-running this also
       // repairs any previously-imported product whose name is now corrected.
-      const existingByImage = new Map(
-        (existingProducts ?? []).filter((p) => p.image_url).map((p) => [p.image_url, p])
-      );
+      const existingByImage = new Map(existingProducts.filter((p) => p.image_url).map((p) => [p.image_url, p]));
 
       const toInsert: { name: string; price: number; image_url: string; category_id: string | null }[] = [];
       const toFix: { id: string; name: string }[] = [];
