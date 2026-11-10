@@ -12,7 +12,7 @@ export interface StaffSession {
   expires_at: number; // epoch ms
 }
 
-const STORAGE_KEY = "mabeste_pos_session";
+export const STORAGE_KEY = "mabeste_pos_session";
 
 const listeners = new Set<() => void>();
 

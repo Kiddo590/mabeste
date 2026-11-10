@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useStaffSession } from "@/lib/auth/useStaffSession";
@@ -9,12 +9,21 @@ import { clearSession } from "@/lib/auth/session";
 export default function PosLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const session = useStaffSession();
+  // getServerSnapshot always returns null, so the very first client render/
+  // effect pass after a hard navigation sees session === null even when a
+  // valid session exists in localStorage — before React's hydration
+  // correction re-render lands with the real value. Skip the redirect check
+  // on that first pass so it doesn't fire on stale data.
+  const [checkedClient, setCheckedClient] = useState(false);
+  useEffect(() => {
+    setCheckedClient(true);
+  }, []);
 
   useEffect(() => {
-    if (session === null) router.replace("/login");
-  }, [session, router]);
+    if (checkedClient && session === null) router.replace("/login");
+  }, [checkedClient, session, router]);
 
-  if (!session) return null;
+  if (!checkedClient || !session) return null;
 
   function logout() {
     clearSession();

@@ -47,21 +47,31 @@ export default function LoginPage() {
 
   if (!selectedStaffId) {
     return (
-      <div className="flex flex-1 flex-col items-center justify-center gap-8 p-8">
-        <h1 className="text-2xl font-semibold">
-          Mabeste <span className="text-amber-600 dark:text-amber-400">POS</span>
-        </h1>
-        {listError && <p className="text-red-600">{listError}</p>}
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-          {staffList.map((s) => (
-            <button
-              key={s.id}
-              onClick={() => setSelectedStaffId(s.id)}
-              className="rounded-xl border border-black/10 bg-white px-8 py-6 text-lg font-medium shadow-sm transition-colors hover:border-amber-500/50 hover:bg-amber-50 dark:border-white/10 dark:bg-zinc-900 dark:hover:border-amber-400/40 dark:hover:bg-amber-950/20"
-            >
-              {s.name}
-            </button>
-          ))}
+      <div className="flex flex-1 flex-col items-center justify-center bg-gradient-to-b from-amber-50/60 via-white to-white p-8 dark:from-amber-950/20 dark:via-zinc-950 dark:to-zinc-950">
+        <div className="flex w-full max-w-xl flex-col items-center gap-10 rounded-3xl border border-black/5 bg-white/80 px-6 py-12 text-center shadow-xl shadow-amber-900/5 backdrop-blur sm:px-12 dark:border-white/5 dark:bg-zinc-900/60">
+          <div className="flex flex-col items-center gap-2">
+            <h1 className="text-5xl font-extrabold tracking-tight sm:text-6xl">
+              Mabeste <span className="text-amber-600 dark:text-amber-400">POS</span>
+            </h1>
+            <p className="text-sm font-medium uppercase tracking-[0.2em] text-zinc-400">
+              Staff sign-in
+            </p>
+          </div>
+          {listError && <p className="text-red-600">{listError}</p>}
+          <div className="grid w-full grid-cols-2 gap-4 sm:grid-cols-3">
+            {staffList.map((s) => (
+              <button
+                key={s.id}
+                onClick={() => setSelectedStaffId(s.id)}
+                className="group flex flex-col items-center gap-3 rounded-2xl border border-black/10 bg-white px-6 py-8 shadow-sm transition-all hover:-translate-y-0.5 hover:border-amber-500/50 hover:bg-amber-50 hover:shadow-lg dark:border-white/10 dark:bg-zinc-900 dark:hover:border-amber-400/40 dark:hover:bg-amber-950/20"
+              >
+                <span className="flex h-14 w-14 items-center justify-center rounded-full bg-amber-100 text-xl font-bold text-amber-700 transition-colors group-hover:bg-amber-600 group-hover:text-white dark:bg-amber-900/40 dark:text-amber-300 dark:group-hover:bg-amber-400 dark:group-hover:text-black">
+                  {s.name.charAt(0).toUpperCase()}
+                </span>
+                <span className="text-lg font-medium">{s.name}</span>
+              </button>
+            ))}
+          </div>
         </div>
       </div>
     );
@@ -70,61 +80,68 @@ export default function LoginPage() {
   const selectedName = staffList.find((s) => s.id === selectedStaffId)?.name;
 
   return (
-    <div className="flex flex-1 flex-col items-center justify-center gap-6 p-8">
-      <button
-        onClick={() => {
-          setSelectedStaffId(null);
-          setPin("");
-          setError(null);
-        }}
-        className="self-start text-sm text-zinc-500 hover:underline"
-      >
-        &larr; Back
-      </button>
-      <h1 className="text-xl font-semibold">{selectedName}</h1>
-      <div className="flex gap-3" aria-label="PIN entry">
-        {Array.from({ length: 6 }).map((_, i) => (
-          <span
-            key={i}
-            className={`h-4 w-4 rounded-full border border-amber-500/40 dark:border-amber-400/40 ${
-              i < pin.length ? "bg-amber-500 dark:bg-amber-400" : ""
-            }`}
-          />
-        ))}
-      </div>
-      {error && <p className="text-red-600">{error}</p>}
-      <div className="grid grid-cols-3 gap-4">
-        {["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((d) => (
+    <div className="flex flex-1 flex-col items-center justify-center bg-gradient-to-b from-amber-50/60 via-white to-white p-8 dark:from-amber-950/20 dark:via-zinc-950 dark:to-zinc-950">
+      <div className="flex w-full max-w-sm flex-col items-center gap-6 rounded-3xl border border-black/5 bg-white/80 px-8 py-10 shadow-xl shadow-amber-900/5 backdrop-blur dark:border-white/5 dark:bg-zinc-900/60">
+        <button
+          onClick={() => {
+            setSelectedStaffId(null);
+            setPin("");
+            setError(null);
+          }}
+          className="self-start text-sm text-zinc-500 hover:text-amber-600 hover:underline dark:hover:text-amber-400"
+        >
+          &larr; Back
+        </button>
+        <div className="flex flex-col items-center gap-1">
+          <span className="flex h-14 w-14 items-center justify-center rounded-full bg-amber-100 text-xl font-bold text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
+            {selectedName?.charAt(0).toUpperCase()}
+          </span>
+          <h1 className="mt-2 text-xl font-semibold">{selectedName}</h1>
+        </div>
+        <div className="flex gap-3" aria-label="PIN entry">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <span
+              key={i}
+              className={`h-4 w-4 rounded-full border border-amber-500/40 dark:border-amber-400/40 ${
+                i < pin.length ? "bg-amber-500 dark:bg-amber-400" : ""
+              }`}
+            />
+          ))}
+        </div>
+        {error && <p className="text-red-600">{error}</p>}
+        <div className="grid grid-cols-3 gap-4">
+          {["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((d) => (
+            <button
+              key={d}
+              onClick={() => pressDigit(d)}
+              disabled={loading}
+              className="h-16 w-16 rounded-full border border-black/10 text-xl font-medium transition-colors active:border-amber-500/40 active:bg-amber-50 dark:border-white/10 dark:active:border-amber-400/30 dark:active:bg-amber-950/30"
+            >
+              {d}
+            </button>
+          ))}
           <button
-            key={d}
-            onClick={() => pressDigit(d)}
+            onClick={backspace}
             disabled={loading}
-            className="h-16 w-16 rounded-full border border-black/10 text-xl font-medium active:border-amber-500/40 active:bg-amber-50 dark:border-white/10 dark:active:border-amber-400/30 dark:active:bg-amber-950/30"
+            className="h-16 w-16 rounded-full text-sm text-zinc-500 hover:text-amber-600 dark:hover:text-amber-400"
           >
-            {d}
+            Delete
           </button>
-        ))}
-        <button
-          onClick={backspace}
-          disabled={loading}
-          className="h-16 w-16 rounded-full text-sm text-zinc-500"
-        >
-          Delete
-        </button>
-        <button
-          onClick={() => pressDigit("0")}
-          disabled={loading}
-          className="h-16 w-16 rounded-full border border-black/10 text-xl font-medium active:border-amber-500/40 active:bg-amber-50 dark:border-white/10 dark:active:border-amber-400/30 dark:active:bg-amber-950/30"
-        >
-          0
-        </button>
-        <button
-          onClick={submit}
-          disabled={loading || pin.length < 4}
-          className="h-16 w-16 rounded-full bg-amber-600 text-sm font-medium text-white transition-colors hover:bg-amber-700 disabled:opacity-30 dark:bg-amber-500 dark:text-black dark:hover:bg-amber-400"
-        >
-          {loading ? "..." : "Go"}
-        </button>
+          <button
+            onClick={() => pressDigit("0")}
+            disabled={loading}
+            className="h-16 w-16 rounded-full border border-black/10 text-xl font-medium transition-colors active:border-amber-500/40 active:bg-amber-50 dark:border-white/10 dark:active:border-amber-400/30 dark:active:bg-amber-950/30"
+          >
+            0
+          </button>
+          <button
+            onClick={submit}
+            disabled={loading || pin.length < 4}
+            className="h-16 w-16 rounded-full bg-amber-600 text-sm font-medium text-white transition-colors hover:bg-amber-700 disabled:opacity-30 dark:bg-amber-500 dark:text-black dark:hover:bg-amber-400"
+          >
+            {loading ? "..." : "Go"}
+          </button>
+        </div>
       </div>
     </div>
   );

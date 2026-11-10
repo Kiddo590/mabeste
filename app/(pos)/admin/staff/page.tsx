@@ -68,8 +68,8 @@ export default function AdminStaffPage() {
   }
 
   return (
-    <div className="flex flex-1 flex-col gap-8 p-6">
-      <section>
+    <div className="flex flex-1 flex-col gap-6 p-6">
+      <section className="rounded-2xl border border-black/10 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-zinc-900">
         <h1 className="mb-4 text-lg font-semibold">Staff</h1>
         {loadError && <p className="text-red-600">{loadError}</p>}
         <table className="w-full max-w-2xl text-left text-sm">
@@ -104,7 +104,7 @@ export default function AdminStaffPage() {
         </table>
       </section>
 
-      <section className="max-w-sm">
+      <section className="max-w-sm rounded-2xl border border-black/10 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-zinc-900">
         <h2 className="mb-4 text-lg font-semibold">Add staff</h2>
         <form onSubmit={handleCreate} className="flex flex-col gap-3">
           <input
