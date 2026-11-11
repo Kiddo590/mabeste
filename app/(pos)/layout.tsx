@@ -101,7 +101,7 @@ function PosLayoutInner({ children }: { children: React.ReactNode }) {
     <div className="flex min-h-full flex-1 flex-col">
       <header className="flex items-center justify-between border-b border-brand-500/20 px-4 py-3 dark:border-brand-400/15">
         <div className="flex items-center gap-4">
-          <span className="font-semibold text-brand-600 dark:text-brand-400">Mabeste POS</span>
+          <span className="font-semibold text-brand-600 dark:text-brand-400">Mabeshte POS</span>
           <nav className="hidden items-center gap-4 md:flex">
             {items.map((item) => (
               <Link

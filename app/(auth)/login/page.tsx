@@ -51,7 +51,7 @@ export default function LoginPage() {
         <div className="flex w-full max-w-xl flex-col items-center gap-10 rounded-3xl border border-black/5 bg-white/80 px-6 py-12 text-center shadow-xl shadow-brand-900/5 backdrop-blur sm:px-12 dark:border-white/5 dark:bg-zinc-900/60">
           <div className="flex flex-col items-center gap-2">
             <h1 className="text-5xl font-extrabold tracking-tight sm:text-6xl">
-              Mabeste <span className="text-brand-600 dark:text-brand-400">POS</span>
+              Mabeshte <span className="text-brand-600 dark:text-brand-400">POS</span>
             </h1>
             <p className="text-sm font-medium uppercase tracking-[0.2em] text-zinc-400">
               Staff sign-in
@@ -137,7 +137,7 @@ export default function LoginPage() {
           <button
             onClick={submit}
             disabled={loading || pin.length < 4}
-            className="h-16 w-16 rounded-full bg-gold-600 text-sm font-medium text-white transition-colors hover:bg-gold-700 disabled:opacity-30 dark:bg-gold-500 dark:text-black dark:hover:bg-gold-400"
+            className="h-16 w-16 rounded-full bg-accent-600 text-sm font-medium text-white transition-colors hover:bg-accent-700 disabled:opacity-30 dark:bg-accent-500 dark:text-black dark:hover:bg-accent-400"
           >
             {loading ? "..." : "Go"}
           </button>

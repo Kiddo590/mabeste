@@ -3,52 +3,87 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@theme {
-  /* Brand (blue) — navigation, structure, headers, focus chrome, badges */
-  --color-brand-50: #eff6ff;
-  --color-brand-100: #dbeafe;
-  --color-brand-200: #bfdbfe;
-  --color-brand-300: #93c5fd;
-  --color-brand-400: #60a5fa;
-  --color-brand-500: #3b82f6;
-  --color-brand-600: #2563eb;
-  --color-brand-700: #1d4ed8;
-  --color-brand-800: #1e40af;
-  --color-brand-900: #1e3a8a;
-  --color-brand-950: #172554;
-
-  /* Gold (accent) — committing buttons / CTAs */
-  --color-gold-50: #fdf8ec;
-  --color-gold-100: #faeecb;
-  --color-gold-200: #f3dd9a;
-  --color-gold-300: #eac766;
-  --color-gold-400: #dfae3f;
-  --color-gold-500: #c89328;
-  --color-gold-600: #a8771f;
-  --color-gold-700: #8a5f1b;
-  --color-gold-800: #714c1c;
-  --color-gold-900: #5f3f1c;
-  --color-gold-950: #36210d;
+  --surface: #ffffff;
+  --surface-raised: #ffffff;
+  --surface-sunken: #f4f6fb;
+  --line: rgb(0 0 0 / 0.08);
+  --line-strong: rgb(0 0 0 / 0.16);
+  --ink-muted: #6b7280;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
     --background: #0a0a0a;
     --foreground: #ededed;
+    --surface: #121212;
+    --surface-raised: #18181b;
+    --surface-sunken: #0f0f10;
+    --line: rgb(255 255 255 / 0.1);
+    --line-strong: rgb(255 255 255 / 0.2);
+    --ink-muted: #9ca3af;
   }
+}
+
+/* Semantic tokens: flip with the color scheme, so pages can write
+   `bg-surface border-line text-ink-muted` instead of repeating
+   `bg-white dark:bg-zinc-900 border-black/10 dark:border-white/10`. */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-surface-sunken: var(--surface-sunken);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-ink-muted: var(--ink-muted);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+@theme {
+  /* Brand (Mabeshte blue) — navigation, structure, headers, focus chrome, badges */
+  --color-brand-50: #eef4ff;
+  --color-brand-100: #dbe6fe;
+  --color-brand-200: #bfd3fe;
+  --color-brand-300: #93b4fd;
+  --color-brand-400: #5f8bfa;
+  --color-brand-500: #3b6cf0;
+  --color-brand-600: #2654e0;
+  --color-brand-700: #1f43c2;
+  --color-brand-800: #1d399b;
+  --color-brand-900: #1c337a;
+  --color-brand-950: #121f4a;
+
+  /* Accent (emerald) — committing buttons, money, success */
+  --color-accent-50: #ecfdf5;
+  --color-accent-100: #d1fae5;
+  --color-accent-200: #a7f3d0;
+  --color-accent-300: #6ee7b7;
+  --color-accent-400: #34d399;
+  --color-accent-500: #10b981;
+  --color-accent-600: #059669;
+  --color-accent-700: #047857;
+  --color-accent-800: #065f46;
+  --color-accent-900: #064e3b;
+  --color-accent-950: #022c22;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  body {
+    background: #ffffff;
+    color: #000000;
+  }
 }

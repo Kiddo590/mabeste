@@ -370,7 +370,7 @@ function TabDetailContent() {
           <button
             onClick={recordCashPayment}
             disabled={busy}
-            className="w-full rounded-lg bg-gold-600 px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-gold-700 disabled:opacity-50 dark:bg-gold-500 dark:text-black dark:hover:bg-gold-400"
+            className="w-full rounded-lg bg-accent-600 px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-accent-700 disabled:opacity-50 dark:bg-accent-500 dark:text-black dark:hover:bg-accent-400"
           >
             Record cash payment — KES {total.balance.toFixed(2)}
           </button>

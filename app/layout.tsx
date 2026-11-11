@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -13,8 +13,17 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Mabeste POS",
-  description: "Point of sale for Mabeste",
+  title: { default: "Mabeshte POS", template: "%s · Mabeshte POS" },
+  description: "Point of sale for Mabeshte",
+  applicationName: "Mabeshte POS",
+  appleWebApp: { capable: true, title: "Mabeshte POS", statusBarStyle: "default" },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#2654e0",
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

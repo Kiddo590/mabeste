@@ -96,7 +96,7 @@ function AdminStaffContent() {
                   </span>
                 </td>
                 <td className="py-2">
-                  <button onClick={() => toggleActive(s)} className="text-gold-600 hover:underline dark:text-gold-400">
+                  <button onClick={() => toggleActive(s)} className="text-accent-600 hover:underline dark:text-accent-400">
                     {s.is_active ? "Deactivate" : "Reactivate"}
                   </button>
                 </td>
@@ -143,7 +143,7 @@ function AdminStaffContent() {
           <button
             type="submit"
             disabled={submitting}
-            className="rounded bg-gold-600 px-4 py-2 text-white transition-colors hover:bg-gold-700 disabled:opacity-50 dark:bg-gold-500 dark:text-black dark:hover:bg-gold-400"
+            className="rounded bg-accent-600 px-4 py-2 text-white transition-colors hover:bg-accent-700 disabled:opacity-50 dark:bg-accent-500 dark:text-black dark:hover:bg-accent-400"
           >
             {submitting ? "Creating..." : "Create staff"}
           </button>

@@ -1,4 +1,4 @@
--- Local dev seed data for Mabeste POS.
+-- Local dev seed data for Mabeshte POS.
 -- PINs here are seed-only placeholders (admin: 0000, cashier: 1111) — never
 -- reuse these in a real deployment. pgcrypto's crypt()/gen_salt('bf')
 -- produces standard bcrypt hashes, verifiable the same way the staff-login
@@ -18,7 +18,7 @@ insert into auth.users (
 
 insert into staff (id, auth_user_id, name, phone, pin_hash, role, is_active) values
   ('aaaaaaaa-0000-0000-0000-000000000001', '11111111-1111-1111-1111-111111111111',
-   'Mabeste Admin', '254700000001', extensions.crypt('0000', extensions.gen_salt('bf')), 'admin', true),
+   'Mabeshte Admin', '254700000001', extensions.crypt('0000', extensions.gen_salt('bf')), 'admin', true),
   ('aaaaaaaa-0000-0000-0000-000000000002', '22222222-2222-2222-2222-222222222222',
    'Cashier One', '254700000002', extensions.crypt('1111', extensions.gen_salt('bf')), 'cashier', true);
 

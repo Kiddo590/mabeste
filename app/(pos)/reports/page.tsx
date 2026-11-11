@@ -113,7 +113,7 @@ export default function ReportsPage() {
           <button
             onClick={load}
             disabled={loading}
-            className="rounded bg-gold-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-gold-700 disabled:opacity-50 dark:bg-gold-500 dark:text-black dark:hover:bg-gold-400"
+            className="rounded bg-accent-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-700 disabled:opacity-50 dark:bg-accent-500 dark:text-black dark:hover:bg-accent-400"
           >
             {loading ? "Loading..." : "Refresh"}
           </button>
@@ -129,7 +129,7 @@ export default function ReportsPage() {
         </div>
         <div className="rounded-2xl border border-black/10 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-zinc-900">
           <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">Cash collected</p>
-          <p className="mt-1 text-2xl font-semibold text-gold-700 dark:text-gold-400">KES {cashCollected.toFixed(2)}</p>
+          <p className="mt-1 text-2xl font-semibold text-accent-700 dark:text-accent-400">KES {cashCollected.toFixed(2)}</p>
           <p className="mt-1 text-xs text-zinc-400">Completed cash payments only</p>
         </div>
         <div className="rounded-2xl border border-black/10 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-zinc-900">
@@ -175,7 +175,7 @@ export default function ReportsPage() {
                   <span className="text-zinc-500">KES {revenue.toFixed(2)}</span>
                 </div>
                 <div className="h-2 overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800">
-                  <div className="h-full rounded-full bg-gold-500" style={{ width: `${(revenue / maxProduct) * 100}%` }} />
+                  <div className="h-full rounded-full bg-accent-500" style={{ width: `${(revenue / maxProduct) * 100}%` }} />
                 </div>
               </div>
             ))}

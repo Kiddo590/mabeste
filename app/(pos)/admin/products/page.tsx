@@ -301,7 +301,7 @@ function AdminProductsContent() {
           <button
             onClick={importStarterCatalogue}
             disabled={importing}
-            className="rounded bg-gold-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-gold-700 disabled:opacity-50 dark:bg-gold-500 dark:text-black dark:hover:bg-gold-400"
+            className="rounded bg-accent-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-700 disabled:opacity-50 dark:bg-accent-500 dark:text-black dark:hover:bg-accent-400"
           >
             {importing ? "Loading catalogue..." : "Load starter catalogue"}
           </button>
@@ -353,7 +353,7 @@ function AdminProductsContent() {
           <button
             type="submit"
             disabled={adding}
-            className="rounded bg-gold-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-gold-700 disabled:opacity-50 dark:bg-gold-500 dark:text-black dark:hover:bg-gold-400"
+            className="rounded bg-accent-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-700 disabled:opacity-50 dark:bg-accent-500 dark:text-black dark:hover:bg-accent-400"
           >
             {adding ? "Adding..." : "Add product"}
           </button>
@@ -438,13 +438,13 @@ function AdminProductsContent() {
                     <button
                       onClick={() => savePrice(p.id)}
                       disabled={savingId === p.id}
-                      className="rounded bg-gold-600 px-2 py-1 text-xs font-medium text-white hover:bg-gold-700 disabled:opacity-50 dark:bg-gold-500 dark:text-black dark:hover:bg-gold-400"
+                      className="rounded bg-accent-600 px-2 py-1 text-xs font-medium text-white hover:bg-accent-700 disabled:opacity-50 dark:bg-accent-500 dark:text-black dark:hover:bg-accent-400"
                     >
                       Save
                     </button>
                     <button
                       onClick={() => toggleActive(p)}
-                      className="ml-auto text-xs text-zinc-500 hover:text-gold-600 dark:hover:text-gold-400"
+                      className="ml-auto text-xs text-zinc-500 hover:text-accent-600 dark:hover:text-accent-400"
                     >
                       {p.is_active ? "Deactivate" : "Reactivate"}
                     </button>
