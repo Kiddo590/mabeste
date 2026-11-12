@@ -1,36 +1,66 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Mabeshte POS
 
-## Getting Started
+A point-of-sale app for Mabeshte: tabs/order-taking, cash and M-Pesa payments, a
+product catalogue with stock tracking, receipts, and staff/table/category
+management. Built with Next.js (App Router, Tailwind v4) and Supabase
+(Postgres + RLS, Edge Functions, Storage, Realtime). Staff sign in with a PIN,
+not email/password — see `supabase/functions/staff-login`.
 
-First, run the development server:
+## Local development
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000). You'll need a `.env.local` with:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```
+NEXT_PUBLIC_SUPABASE_URL=...
+NEXT_PUBLIC_SUPABASE_ANON_KEY=...
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Database changes live in `supabase/migrations/`; apply them with
+`npx supabase db push --remote --yes` (the project must already be linked —
+`npx supabase link`). Edge Functions live in `supabase/functions/` and deploy
+with `npx supabase functions deploy <name>`.
 
-## Learn More
+## Going live with M-Pesa (STK Push)
 
-To learn more about Next.js, take a look at the following resources:
+The app ships sandbox-ready: `supabase/functions/mpesa-initiate`,
+`mpesa-callback` and `mpesa-query` implement the Daraja STK Push flow, but
+nothing will actually reach Safaricom until these secrets are set.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+1. Create a Daraja app at [developer.safaricom.co.ke](https://developer.safaricom.co.ke)
+   to get a consumer key and secret. For testing, use the sandbox shortcode
+   `174379` and the sandbox passkey shown in the portal.
+2. Set the function secrets (never commit these):
+   ```bash
+   npx supabase secrets set \
+     MPESA_ENV=sandbox \
+     MPESA_CONSUMER_KEY=... \
+     MPESA_CONSUMER_SECRET=... \
+     MPESA_SHORTCODE=174379 \
+     MPESA_PASSKEY=... \
+     MPESA_CALLBACK_TOKEN=$(openssl rand -hex 24)
+   ```
+   `MPESA_TRANSACTION_TYPE` (default `CustomerPayBillOnline`) and
+   `MPESA_PARTY_B` (defaults to the shortcode; set this to the till number
+   instead for `CustomerBuyGoodsOnline`) are optional.
+3. Deploy the three functions:
+   ```bash
+   npx supabase functions deploy mpesa-initiate mpesa-callback mpesa-query
+   ```
+4. Open a tab, add an item, choose M-Pesa, and pay with a
+   [Daraja sandbox test number](https://developer.safaricom.co.ke/Documentation).
+   Confirm the payment settles and the tab closes.
+5. When the real Paybill/Till is approved, switch to production: set
+   `MPESA_ENV=production` plus the real shortcode/passkey/consumer key and
+   secret (and `MPESA_TRANSACTION_TYPE`/`MPESA_PARTY_B` if using a Till), then
+   register the callback URL
+   (`https://<project-ref>.supabase.co/functions/v1/mpesa-callback?token=<MPESA_CALLBACK_TOKEN>`)
+   on the production app and redeploy.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Deploying the app
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Hosted on Vercel, connected to this repo's `master` branch.
