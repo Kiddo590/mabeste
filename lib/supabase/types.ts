@@ -129,6 +129,7 @@ export interface Database {
           status: PaymentStatus;
           mpesa_checkout_request_id: string | null;
           mpesa_receipt_number: string | null;
+          failure_reason: string | null;
           recorded_by: string | null;
           created_at: string;
           completed_at: string | null;

@@ -2,11 +2,21 @@
 
 import { useEffect, useState } from "react";
 import { getSupabaseClient } from "@/lib/supabase/client";
+import { fetchAllRows } from "@/lib/supabase/pagination";
+import { RequireAdmin } from "../_components/RequireAdmin";
+import { useToast } from "../_components/Toast";
+import { Button } from "../_components/Button";
+import { Input } from "../_components/Field";
+import { PageHeader } from "../_components/PageHeader";
+import { SkeletonCard } from "../_components/Skeleton";
+import { EmptyState } from "../_components/EmptyState";
+import { formatKES, nairobiDateString, nairobiDayEndISO, nairobiDayStartISO, shiftDateString } from "@/lib/format";
 
 type OrderItemReport = {
   quantity: number;
   unit_price: number;
   products: { name: string; categories: { name: string } | null } | null;
+  orders: { tabs: { status: string } | null } | null;
 };
 
 type PaymentReport = {
@@ -14,54 +24,76 @@ type PaymentReport = {
   method: "cash" | "mpesa";
 };
 
-function todayStr() {
-  return new Date().toISOString().slice(0, 10);
+function weekStart(dateStr: string): string {
+  // Nairobi weekday: anchor at noon +03:00 so UTC date math never crosses
+  // the local day boundary.
+  const d = new Date(`${dateStr}T12:00:00+03:00`);
+  const dow = d.getUTCDay(); // 0 = Sunday
+  const mondayOffset = dow === 0 ? -6 : 1 - dow;
+  return shiftDateString(dateStr, mondayOffset);
 }
 
-export default function ReportsPage() {
-  const [from, setFrom] = useState(todayStr());
-  const [to, setTo] = useState(todayStr());
+function monthStart(dateStr: string): string {
+  return `${dateStr.slice(0, 7)}-01`;
+}
+
+function ReportsContent() {
+  const toast = useToast();
+  const today = nairobiDateString();
+  const [from, setFrom] = useState(today);
+  const [to, setTo] = useState(today);
   const [items, setItems] = useState<OrderItemReport[]>([]);
   const [payments, setPayments] = useState<PaymentReport[]>([]);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  async function load() {
+  async function load(fromDate: string, toDate: string) {
     setLoading(true);
-    setLoadError(null);
     try {
       const supabase = getSupabaseClient();
-      const startIso = new Date(`${from}T00:00:00`).toISOString();
-      const endIso = new Date(`${to}T23:59:59.999`).toISOString();
-      const [{ data: itemRows, error: itemError }, { data: paymentRows, error: paymentError }] = await Promise.all([
-        supabase
-          .from("order_items")
-          .select("quantity, unit_price, products(name, categories(name))")
-          .eq("line_status", "active")
-          .gte("created_at", startIso)
-          .lte("created_at", endIso),
-        supabase
-          .from("payments")
-          .select("amount, method")
-          .eq("status", "completed")
-          .gte("completed_at", startIso)
-          .lte("completed_at", endIso),
+      const startIso = nairobiDayStartISO(fromDate);
+      const endIso = nairobiDayEndISO(toDate);
+      const [itemRows, paymentRows] = await Promise.all([
+        fetchAllRows<OrderItemReport>(
+          (from_, to_) =>
+            supabase
+              .from("order_items")
+              .select("quantity, unit_price, products(name, categories(name)), orders!inner(tabs!inner(status))")
+              .eq("line_status", "active")
+              .gte("created_at", startIso)
+              .lte("created_at", endIso)
+              .range(from_, to_) as unknown as PromiseLike<{ data: OrderItemReport[] | null; error: { message: string } | null }>
+        ),
+        fetchAllRows<PaymentReport>((from_, to_) =>
+          supabase
+            .from("payments")
+            .select("amount, method")
+            .eq("status", "completed")
+            .gte("completed_at", startIso)
+            .lte("completed_at", endIso)
+            .range(from_, to_)
+        ),
       ]);
-      if (itemError || paymentError) {
-        setLoadError(itemError?.message ?? paymentError?.message ?? "Failed to load report");
-        return;
-      }
-      setItems((itemRows ?? []) as unknown as OrderItemReport[]);
-      setPayments((paymentRows ?? []) as unknown as PaymentReport[]);
+      // Voiding a tab doesn't void its individual order lines, so exclude
+      // voided tabs' items here rather than trusting line_status alone.
+      setItems(itemRows.filter((i) => i.orders?.tabs?.status !== "voided"));
+      setPayments(paymentRows);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to load report");
     } finally {
       setLoading(false);
     }
   }
 
   useEffect(() => {
-    load();
+    load(from, to);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  function applyPreset(f: string, t: string) {
+    setFrom(f);
+    setTo(t);
+    load(f, t);
+  }
 
   const salesTotal = items.reduce((sum, i) => sum + i.quantity * i.unit_price, 0);
   const cashCollected = payments.filter((p) => p.method === "cash").reduce((sum, p) => sum + p.amount, 0);
@@ -88,70 +120,87 @@ export default function ReportsPage() {
     .slice(0, 8);
   const maxProduct = Math.max(1, ...topProducts.map(([, v]) => v.revenue));
 
+  const presetClass = "rounded-full px-3 py-1 text-xs font-medium bg-surface-sunken text-ink-muted hover:text-foreground transition-colors";
+
   return (
-    <div className="flex flex-1 flex-col gap-6 p-6">
-      <section className="rounded-2xl border border-black/10 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-zinc-900">
-        <div className="flex flex-wrap items-end gap-3">
-          <div className="flex flex-col gap-1">
-            <label className="text-xs text-zinc-500">From</label>
-            <input
-              type="date"
-              value={from}
-              onChange={(e) => setFrom(e.target.value)}
-              className="rounded border border-black/10 px-3 py-2 text-sm focus:border-brand-500/50 focus:outline-none dark:border-white/10 dark:bg-zinc-900 dark:focus:border-brand-400/40"
-            />
-          </div>
-          <div className="flex flex-col gap-1">
-            <label className="text-xs text-zinc-500">To</label>
-            <input
-              type="date"
-              value={to}
-              onChange={(e) => setTo(e.target.value)}
-              className="rounded border border-black/10 px-3 py-2 text-sm focus:border-brand-500/50 focus:outline-none dark:border-white/10 dark:bg-zinc-900 dark:focus:border-brand-400/40"
-            />
-          </div>
-          <button
-            onClick={load}
-            disabled={loading}
-            className="rounded bg-accent-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-700 disabled:opacity-50 dark:bg-accent-500 dark:text-black dark:hover:bg-accent-400"
-          >
-            {loading ? "Loading..." : "Refresh"}
+    <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
+      <PageHeader title="Reports" subtitle="Sales and payments for the selected date range (East Africa Time)." />
+
+      <section className="rounded-2xl border border-line bg-surface p-4 shadow-sm md:p-6">
+        <div className="mb-3 flex flex-wrap gap-2">
+          <button className={presetClass} onClick={() => applyPreset(today, today)}>
+            Today
+          </button>
+          <button className={presetClass} onClick={() => applyPreset(shiftDateString(today, -1), shiftDateString(today, -1))}>
+            Yesterday
+          </button>
+          <button className={presetClass} onClick={() => applyPreset(weekStart(today), today)}>
+            This week
+          </button>
+          <button className={presetClass} onClick={() => applyPreset(monthStart(today), today)}>
+            This month
           </button>
         </div>
-        {loadError && <p className="mt-3 text-red-600">{loadError}</p>}
-      </section>
-
-      <section className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <div className="rounded-2xl border border-black/10 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-zinc-900">
-          <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">Sales recognized</p>
-          <p className="mt-1 text-2xl font-semibold text-brand-700 dark:text-brand-300">KES {salesTotal.toFixed(2)}</p>
-          <p className="mt-1 text-xs text-zinc-400">From order items, including unpaid open tabs</p>
-        </div>
-        <div className="rounded-2xl border border-black/10 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-zinc-900">
-          <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">Cash collected</p>
-          <p className="mt-1 text-2xl font-semibold text-accent-700 dark:text-accent-400">KES {cashCollected.toFixed(2)}</p>
-          <p className="mt-1 text-xs text-zinc-400">Completed cash payments only</p>
-        </div>
-        <div className="rounded-2xl border border-black/10 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-zinc-900">
-          <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">M-Pesa collected</p>
-          <p className="mt-1 text-2xl font-semibold">KES {mpesaCollected.toFixed(2)}</p>
-          <p className="mt-1 text-xs text-zinc-400">No M-Pesa integration yet — always 0</p>
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-ink-muted">From</label>
+            <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-ink-muted">To</label>
+            <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+          </div>
+          <Button loading={loading} onClick={() => load(from, to)}>
+            Refresh
+          </Button>
         </div>
       </section>
 
-      <section className="rounded-2xl border border-black/10 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-zinc-900">
-        <h2 className="mb-4 text-sm font-semibold text-zinc-500">Revenue by category</h2>
-        {categoryRows.length === 0 ? (
-          <p className="text-sm text-zinc-500">No sales in this range.</p>
+      {loading ? (
+        <section className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <SkeletonCard />
+          <SkeletonCard />
+          <SkeletonCard />
+        </section>
+      ) : (
+        <section className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div className="rounded-2xl border border-line bg-surface p-5 shadow-sm">
+            <p className="text-xs font-medium uppercase tracking-wide text-ink-muted">Sales recognized</p>
+            <p className="tabular mt-1 text-2xl font-semibold text-brand-700 dark:text-brand-300">{formatKES(salesTotal)}</p>
+            <p className="mt-1 text-xs text-ink-muted">From order items, including unpaid open tabs</p>
+          </div>
+          <div className="rounded-2xl border border-line bg-surface p-5 shadow-sm">
+            <p className="text-xs font-medium uppercase tracking-wide text-ink-muted">Cash collected</p>
+            <p className="tabular mt-1 text-2xl font-semibold text-accent-700 dark:text-accent-400">{formatKES(cashCollected)}</p>
+            <p className="mt-1 text-xs text-ink-muted">Completed cash payments only</p>
+          </div>
+          <div className="rounded-2xl border border-line bg-surface p-5 shadow-sm">
+            <p className="text-xs font-medium uppercase tracking-wide text-ink-muted">M-Pesa collected</p>
+            <p className="tabular mt-1 text-2xl font-semibold text-accent-700 dark:text-accent-400">{formatKES(mpesaCollected)}</p>
+            <p className="mt-1 text-xs text-ink-muted">Completed M-Pesa payments only</p>
+          </div>
+        </section>
+      )}
+
+      <section className="rounded-2xl border border-line bg-surface p-4 shadow-sm md:p-6">
+        <h2 className="mb-4 text-sm font-semibold text-ink-muted">Revenue by category</h2>
+        {loading ? (
+          <div className="flex flex-col gap-3">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="h-2 animate-pulse rounded-full bg-line" />
+            ))}
+          </div>
+        ) : categoryRows.length === 0 ? (
+          <EmptyState title="No sales in this range" />
         ) : (
           <div className="flex flex-col gap-3">
             {categoryRows.map(([name, value]) => (
               <div key={name}>
                 <div className="mb-1 flex items-center justify-between text-sm">
                   <span>{name}</span>
-                  <span className="text-zinc-500">KES {value.toFixed(2)}</span>
+                  <span className="tabular text-ink-muted">{formatKES(value)}</span>
                 </div>
-                <div className="h-2 overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800">
+                <div className="h-2 overflow-hidden rounded-full bg-surface-sunken">
                   <div className="h-full rounded-full bg-brand-500" style={{ width: `${(value / maxCategory) * 100}%` }} />
                 </div>
               </div>
@@ -160,21 +209,27 @@ export default function ReportsPage() {
         )}
       </section>
 
-      <section className="rounded-2xl border border-black/10 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-zinc-900">
-        <h2 className="mb-4 text-sm font-semibold text-zinc-500">Top products</h2>
-        {topProducts.length === 0 ? (
-          <p className="text-sm text-zinc-500">No sales in this range.</p>
+      <section className="rounded-2xl border border-line bg-surface p-4 shadow-sm md:p-6">
+        <h2 className="mb-4 text-sm font-semibold text-ink-muted">Top products</h2>
+        {loading ? (
+          <div className="flex flex-col gap-3">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="h-2 animate-pulse rounded-full bg-line" />
+            ))}
+          </div>
+        ) : topProducts.length === 0 ? (
+          <EmptyState title="No sales in this range" />
         ) : (
           <div className="flex flex-col gap-3">
             {topProducts.map(([name, { qty, revenue }]) => (
               <div key={name}>
                 <div className="mb-1 flex items-center justify-between text-sm">
                   <span>
-                    {name} <span className="text-zinc-400">&times;{qty}</span>
+                    {name} <span className="text-ink-muted">&times;{qty}</span>
                   </span>
-                  <span className="text-zinc-500">KES {revenue.toFixed(2)}</span>
+                  <span className="tabular text-ink-muted">{formatKES(revenue)}</span>
                 </div>
-                <div className="h-2 overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800">
+                <div className="h-2 overflow-hidden rounded-full bg-surface-sunken">
                   <div className="h-full rounded-full bg-accent-500" style={{ width: `${(revenue / maxProduct) * 100}%` }} />
                 </div>
               </div>
@@ -183,5 +238,13 @@ export default function ReportsPage() {
         )}
       </section>
     </div>
+  );
+}
+
+export default function ReportsPage() {
+  return (
+    <RequireAdmin>
+      <ReportsContent />
+    </RequireAdmin>
   );
 }

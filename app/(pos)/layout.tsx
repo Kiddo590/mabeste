@@ -5,8 +5,20 @@ import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { useStaffSession } from "@/lib/auth/useStaffSession";
 import { clearSession } from "@/lib/auth/session";
+import { ToastProvider } from "./_components/Toast";
+import { ConfirmProvider } from "./_components/ConfirmDialog";
+import { Badge } from "./_components/Badge";
 
 type IconProps = { className?: string };
+
+function HomeIcon({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} className={className}>
+      <path d="M4 11.5 12 4l8 7.5" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M6 10v9a1 1 0 0 0 1 1h3v-6h4v6h3a1 1 0 0 0 1-1v-9" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
 
 function TabsIcon({ className }: IconProps) {
   return (
@@ -62,8 +74,9 @@ type NavItem = {
 };
 
 const NAV_ITEMS: NavItem[] = [
+  { href: "/dashboard", label: "Home", adminOnly: false, icon: HomeIcon },
   { href: "/tabs", label: "Tabs", adminOnly: false, icon: TabsIcon },
-  { href: "/reports", label: "Reports", adminOnly: false, icon: ReportsIcon },
+  { href: "/reports", label: "Reports", adminOnly: true, icon: ReportsIcon },
   { href: "/admin/staff", label: "Staff", adminOnly: true, icon: StaffIcon },
   { href: "/admin/products", label: "Products", adminOnly: true, icon: ProductsIcon },
   { href: "/admin/inventory", label: "Inventory", adminOnly: true, icon: InventoryIcon },
@@ -94,62 +107,70 @@ function PosLayoutInner({ children }: { children: React.ReactNode }) {
     router.replace("/login");
   }
 
-  const items = NAV_ITEMS.filter((i) => !i.adminOnly || session.staff_role === "admin");
+  const isAdmin = session.staff_role === "admin";
+  const items = NAV_ITEMS.filter((i) => !i.adminOnly || isAdmin);
   const isActive = (href: string) => pathname === href || pathname?.startsWith(href + "/");
 
   return (
-    <div className="flex min-h-full flex-1 flex-col">
-      <header className="flex items-center justify-between border-b border-brand-500/20 px-4 py-3 dark:border-brand-400/15">
-        <div className="flex items-center gap-4">
-          <span className="font-semibold text-brand-600 dark:text-brand-400">Mabeshte POS</span>
-          <nav className="hidden items-center gap-4 md:flex">
-            {items.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`text-sm hover:text-brand-600 hover:underline dark:hover:text-brand-400 ${
-                  isActive(item.href) ? "font-semibold text-brand-600 dark:text-brand-400" : ""
-                }`}
-              >
-                {item.label}
+    <ToastProvider>
+      <ConfirmProvider>
+        <div className="flex min-h-full flex-1 flex-col">
+          <header className="no-print flex items-center justify-between border-b border-line bg-surface px-4 py-3">
+            <div className="flex items-center gap-4">
+              <Link href="/dashboard" className="font-semibold text-brand-600 dark:text-brand-400">
+                Mabeshte POS
               </Link>
-            ))}
+              <nav className="hidden items-center gap-4 md:flex">
+                {items.map((item) => (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={`text-sm transition-colors hover:text-brand-600 dark:hover:text-brand-400 ${
+                      isActive(item.href) ? "font-semibold text-brand-600 dark:text-brand-400" : "text-foreground"
+                    }`}
+                  >
+                    {item.label}
+                  </Link>
+                ))}
+              </nav>
+            </div>
+            <div className="flex items-center gap-3 text-sm">
+              <span className="hidden items-center gap-2 sm:flex">
+                <span className="text-ink-muted">{session.staff_name}</span>
+                <Badge variant={isAdmin ? "brand" : "neutral"}>{isAdmin ? "Admin" : "Cashier"}</Badge>
+              </span>
+              <button
+                onClick={logout}
+                className="text-ink-muted transition-colors hover:text-brand-600 dark:hover:text-brand-400"
+              >
+                Log out
+              </button>
+            </div>
+          </header>
+
+          <main className="flex flex-1 flex-col pb-16 md:pb-0">{children}</main>
+
+          <nav className="no-print fixed inset-x-0 bottom-0 z-40 flex items-stretch justify-around border-t border-line bg-surface pb-[env(safe-area-inset-bottom)] md:hidden">
+            {items.map((item) => {
+              const Icon = item.icon;
+              const active = isActive(item.href);
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={`flex flex-1 flex-col items-center gap-0.5 py-2 text-[11px] ${
+                    active ? "text-brand-600 dark:text-brand-400" : "text-ink-muted"
+                  }`}
+                >
+                  <Icon className="h-5 w-5" />
+                  {item.label}
+                </Link>
+              );
+            })}
           </nav>
         </div>
-        <div className="flex items-center gap-3 text-sm">
-          <span className="hidden text-zinc-500 sm:inline">
-            {session.staff_name} &middot; {session.staff_role}
-          </span>
-          <button
-            onClick={logout}
-            className="text-zinc-500 hover:text-brand-600 hover:underline dark:hover:text-brand-400"
-          >
-            Log out
-          </button>
-        </div>
-      </header>
-
-      <main className="flex flex-1 flex-col pb-16 md:pb-0">{children}</main>
-
-      <nav className="fixed inset-x-0 bottom-0 z-40 flex items-stretch justify-around border-t border-brand-500/20 bg-white pb-[env(safe-area-inset-bottom)] md:hidden dark:border-brand-400/15 dark:bg-zinc-950">
-        {items.map((item) => {
-          const Icon = item.icon;
-          const active = isActive(item.href);
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`flex flex-1 flex-col items-center gap-0.5 py-2 text-[11px] ${
-                active ? "text-brand-600 dark:text-brand-400" : "text-zinc-500"
-              }`}
-            >
-              <Icon className="h-5 w-5" />
-              {item.label}
-            </Link>
-          );
-        })}
-      </nav>
-    </div>
+      </ConfirmProvider>
+    </ToastProvider>
   );
 }
 

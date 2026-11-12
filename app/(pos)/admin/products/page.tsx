@@ -9,6 +9,14 @@ import type { Database } from "@/lib/supabase/types";
 import starterCatalogue from "@/lib/data/starter-catalogue.json";
 import { ImageUploadField } from "../../_components/ImageUploadField";
 import { RequireAdmin } from "../../_components/RequireAdmin";
+import { useToast } from "../../_components/Toast";
+import { useConfirm } from "../../_components/ConfirmDialog";
+import { Badge } from "../../_components/Badge";
+import { Button } from "../../_components/Button";
+import { Input, Select } from "../../_components/Field";
+import { PageHeader } from "../../_components/PageHeader";
+import { SkeletonGrid } from "../../_components/Skeleton";
+import { EmptyState } from "../../_components/EmptyState";
 
 type ProductRow = Database["public"]["Tables"]["products"]["Row"];
 type CategoryRow = Database["public"]["Tables"]["categories"]["Row"];
@@ -16,7 +24,15 @@ type CategoryRow = Database["public"]["Tables"]["categories"]["Row"];
 const STARTER_CATEGORY_NAMES = ["Beer", "Spirits", "Wine"] as const;
 const PAGE_SIZE = 60;
 
-function ProductThumb({ product, onReplace }: { product: ProductRow; onReplace: (url: string) => void }) {
+function ProductThumb({
+  product,
+  onReplace,
+  onError,
+}: {
+  product: ProductRow;
+  onReplace: (url: string) => void;
+  onError: (message: string) => void;
+}) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
 
@@ -26,9 +42,8 @@ function ProductThumb({ product, onReplace }: { product: ProductRow; onReplace: 
     try {
       const url = await uploadProductImage(file);
       onReplace(url);
-    } catch {
-      // Lightweight inline affordance — on failure the thumbnail just stays
-      // as-is; the admin can try again.
+    } catch (err) {
+      onError(err instanceof Error ? err.message : "Upload failed");
     } finally {
       setUploading(false);
     }
@@ -38,7 +53,8 @@ function ProductThumb({ product, onReplace }: { product: ProductRow; onReplace: 
     <button
       type="button"
       onClick={() => inputRef.current?.click()}
-      className="group relative h-20 w-20 shrink-0 overflow-hidden rounded-xl bg-brand-50 dark:bg-brand-950/20"
+      title="Change photo"
+      className="group relative h-20 w-20 shrink-0 overflow-hidden rounded-xl bg-brand-50 dark:bg-brand-950/30"
     >
       {product.image_url ? (
         <Image src={product.image_url} alt={product.name} fill sizes="80px" className="object-cover" />
@@ -82,11 +98,13 @@ function ProductThumb({ product, onReplace }: { product: ProductRow; onReplace: 
 }
 
 function AdminProductsContent() {
+  const toast = useToast();
+  const confirm = useConfirm();
+
   const [products, setProducts] = useState<ProductRow[]>([]);
   const [categories, setCategories] = useState<CategoryRow[]>([]);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
   const [importing, setImporting] = useState(false);
-  const [importError, setImportError] = useState<string | null>(null);
   const [priceDrafts, setPriceDrafts] = useState<Record<string, string>>({});
   const [savingId, setSavingId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -113,17 +131,19 @@ function AdminProductsContent() {
       setCategories(cats);
       setProducts(prods);
     } catch (err) {
-      setLoadError(err instanceof Error ? err.message : "Failed to load products");
+      toast.error(err instanceof Error ? err.message : "Couldn't load products");
+    } finally {
+      setLoading(false);
     }
   }
 
   useEffect(() => {
     loadAll();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function importStarterCatalogue() {
     setImporting(true);
-    setImportError(null);
     try {
       const supabase = getSupabaseClient();
 
@@ -206,37 +226,67 @@ function AdminProductsContent() {
       }
 
       await loadAll();
+      if (toInsert.length === 0 && toFix.length === 0) toast.info("Catalogue is already up to date");
+      else toast.success(`Catalogue loaded — ${toInsert.length} added, ${toFix.length} updated`);
     } catch (err) {
-      setImportError(err instanceof Error ? err.message : "Import failed");
+      toast.error(err instanceof Error ? err.message : "Import failed");
     } finally {
       setImporting(false);
     }
   }
 
-  async function savePrice(id: string) {
-    const draft = priceDrafts[id];
+  async function savePrice(product: ProductRow) {
+    const draft = priceDrafts[product.id];
     const price = Number(draft);
-    if (!draft || Number.isNaN(price) || price < 0) return;
-    setSavingId(id);
+    if (draft === undefined || draft === "" || Number.isNaN(price) || price < 0) return;
+    setSavingId(product.id);
     try {
-      const { error } = await getSupabaseClient().from("products").update({ price }).eq("id", id);
-      if (!error) await loadAll();
+      const { error } = await getSupabaseClient().from("products").update({ price }).eq("id", product.id);
+      if (error) throw new Error(error.message);
+      setPriceDrafts((d) => {
+        const next = { ...d };
+        delete next[product.id];
+        return next;
+      });
+      toast.success(`${product.name} priced at KES ${price}`);
+      await loadAll();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Couldn't save price");
     } finally {
       setSavingId(null);
     }
   }
 
   async function toggleActive(row: ProductRow) {
+    if (row.is_active) {
+      const ok = await confirm({
+        title: `Hide ${row.name} from the menu?`,
+        message: "Deactivated products can't be added to tabs. You can reactivate it any time.",
+        confirmLabel: "Deactivate",
+        danger: true,
+      });
+      if (!ok) return;
+    }
     const { error } = await getSupabaseClient()
       .from("products")
       .update({ is_active: !row.is_active })
       .eq("id", row.id);
-    if (!error) loadAll();
+    if (error) {
+      toast.error(`Couldn't update ${row.name}: ${error.message}`);
+      return;
+    }
+    toast.success(row.is_active ? `${row.name} deactivated` : `${row.name} reactivated`);
+    await loadAll();
   }
 
-  async function replaceProductImage(id: string, url: string | null) {
-    const { error } = await getSupabaseClient().from("products").update({ image_url: url }).eq("id", id);
-    if (!error) loadAll();
+  async function replaceProductImage(product: ProductRow, url: string) {
+    const { error } = await getSupabaseClient().from("products").update({ image_url: url }).eq("id", product.id);
+    if (error) {
+      toast.error(`Couldn't save photo: ${error.message}`);
+      return;
+    }
+    toast.success(`Photo updated for ${product.name}`);
+    await loadAll();
   }
 
   async function addProduct(e: React.FormEvent) {
@@ -261,6 +311,7 @@ function AdminProductsContent() {
         size: newSize.trim() || null,
       });
       if (error) throw new Error(error.message);
+      toast.success(`${newName.trim()} added`);
       setNewName("");
       setNewPrice("");
       setNewCategoryId("");
@@ -281,64 +332,57 @@ function AdminProductsContent() {
     return true;
   });
   const visibleProducts = filteredProducts.slice(0, visibleCount);
+  const unpricedCount = products.filter((p) => p.is_active && p.price <= 0).length;
 
   useEffect(() => {
     setVisibleCount(PAGE_SIZE);
   }, [search, categoryFilter]);
 
-  return (
-    <div className="flex flex-1 flex-col gap-6 p-6">
-      <section className="rounded-2xl border border-black/10 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-zinc-900">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <h1 className="text-lg font-semibold">Products</h1>
-            <p className="text-sm text-zinc-500">
-              {products.length === 0
-                ? "No products yet — load the starter catalogue to get going, then set your own prices below."
-                : "Set a price for each product. New items default to 0 until priced."}
-            </p>
-          </div>
-          <button
-            onClick={importStarterCatalogue}
-            disabled={importing}
-            className="rounded bg-accent-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-700 disabled:opacity-50 dark:bg-accent-500 dark:text-black dark:hover:bg-accent-400"
-          >
-            {importing ? "Loading catalogue..." : "Load starter catalogue"}
-          </button>
-        </div>
-        {importError && <p className="mt-3 text-red-600">{importError}</p>}
-        {loadError && <p className="mt-3 text-red-600">{loadError}</p>}
-      </section>
+  const pill = (active: boolean) =>
+    `rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+      active ? "bg-brand-600 text-white" : "bg-surface-sunken text-ink-muted hover:text-foreground"
+    }`;
 
-      <section className="rounded-2xl border border-black/10 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-zinc-900">
-        <h2 className="mb-4 text-lg font-semibold">Add a product</h2>
+  return (
+    <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
+      <PageHeader
+        title="Products"
+        subtitle={
+          loading
+            ? undefined
+            : products.length === 0
+              ? "No products yet — load the starter catalogue to get going, then set your own prices."
+              : unpricedCount > 0
+                ? `${unpricedCount} products still have no price and are hidden from the order screen.`
+                : "Everything is priced and ready to sell."
+        }
+        actions={
+          <Button variant={products.length === 0 ? "primary" : "secondary"} loading={importing} onClick={importStarterCatalogue}>
+            {importing ? "Loading catalogue..." : "Load starter catalogue"}
+          </Button>
+        }
+      />
+
+      <section className="rounded-2xl border border-line bg-surface p-4 shadow-sm md:p-6">
+        <h2 className="mb-4 text-base font-semibold">Add a product</h2>
         <form onSubmit={addProduct} className="flex flex-wrap items-start gap-3">
-          <input
+          <Input
             placeholder="Name"
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
-            className="min-w-0 flex-1 rounded border border-black/10 px-3 py-2 text-sm focus:border-brand-500/50 focus:outline-none dark:border-white/10 dark:bg-zinc-900 dark:focus:border-brand-400/40"
+            className="min-w-0 flex-1"
           />
-          <select
-            value={newCategoryId}
-            onChange={(e) => setNewCategoryId(e.target.value)}
-            className="rounded border border-black/10 px-3 py-2 text-sm focus:border-brand-500/50 focus:outline-none dark:border-white/10 dark:bg-zinc-900 dark:focus:border-brand-400/40"
-          >
+          <Select value={newCategoryId} onChange={(e) => setNewCategoryId(e.target.value)}>
             <option value="">Category</option>
             {categories.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}
               </option>
             ))}
-          </select>
-          <input
-            placeholder="Size (e.g. 750ml)"
-            value={newSize}
-            onChange={(e) => setNewSize(e.target.value)}
-            className="w-32 rounded border border-black/10 px-3 py-2 text-sm focus:border-brand-500/50 focus:outline-none dark:border-white/10 dark:bg-zinc-900 dark:focus:border-brand-400/40"
-          />
-          <div className="flex items-center overflow-hidden rounded border border-black/10 focus-within:border-brand-500/50 dark:border-white/10 dark:focus-within:border-brand-400/40">
-            <span className="bg-zinc-50 px-1.5 text-xs text-zinc-400 dark:bg-zinc-800">KES</span>
+          </Select>
+          <Input placeholder="Size (e.g. 750ml)" value={newSize} onChange={(e) => setNewSize(e.target.value)} className="w-36" />
+          <div className="flex items-center overflow-hidden rounded-lg border border-line transition-colors focus-within:border-brand-500">
+            <span className="bg-surface-sunken px-2 text-xs text-ink-muted">KES</span>
             <input
               type="number"
               min={0}
@@ -346,123 +390,111 @@ function AdminProductsContent() {
               placeholder="0"
               value={newPrice}
               onChange={(e) => setNewPrice(e.target.value)}
-              className="w-20 appearance-none px-2 py-2 text-sm outline-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none dark:bg-zinc-900"
+              className="w-24 appearance-none bg-transparent px-2 py-2 text-sm outline-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
             />
           </div>
           <ImageUploadField value={newImageUrl || null} onChange={(url) => setNewImageUrl(url ?? "")} />
-          <button
-            type="submit"
-            disabled={adding}
-            className="rounded bg-accent-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-700 disabled:opacity-50 dark:bg-accent-500 dark:text-black dark:hover:bg-accent-400"
-          >
-            {adding ? "Adding..." : "Add product"}
-          </button>
+          <Button type="submit" loading={adding}>
+            Add product
+          </Button>
         </form>
-        {addError && <p className="mt-3 text-red-600">{addError}</p>}
+        {addError && <p className="mt-3 text-sm text-red-600">{addError}</p>}
       </section>
 
-      {products.length > 0 && (
-        <section className="rounded-2xl border border-black/10 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-zinc-900">
-          <div className="mb-3 flex flex-wrap gap-2">
-            <button
-              onClick={() => setCategoryFilter(null)}
-              className={`rounded-full px-3 py-1 text-xs font-medium ${
-                !categoryFilter ? "bg-brand-600 text-white" : "bg-zinc-100 text-zinc-600 dark:bg-zinc-800"
-              }`}
-            >
-              All
+      <section className="rounded-2xl border border-line bg-surface p-4 shadow-sm md:p-6">
+        <div className="mb-3 flex flex-wrap gap-2">
+          <button onClick={() => setCategoryFilter(null)} className={pill(!categoryFilter)}>
+            All
+          </button>
+          {categories.map((c) => (
+            <button key={c.id} onClick={() => setCategoryFilter(c.id)} className={pill(categoryFilter === c.id)}>
+              {c.name}
             </button>
-            {categories.map((c) => (
-              <button
-                key={c.id}
-                onClick={() => setCategoryFilter(c.id)}
-                className={`rounded-full px-3 py-1 text-xs font-medium ${
-                  categoryFilter === c.id ? "bg-brand-600 text-white" : "bg-zinc-100 text-zinc-600 dark:bg-zinc-800"
-                }`}
-              >
-                {c.name}
-              </button>
-            ))}
-          </div>
-          <div className="mb-4 flex items-center gap-2 rounded border border-black/10 px-3 py-2 focus-within:border-brand-500/50 dark:border-white/10 dark:focus-within:border-brand-400/40">
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={1.5}
-              className="h-4 w-4 shrink-0 text-zinc-400"
-            >
-              <circle cx="11" cy="11" r="7" />
-              <path d="m20 20-3-3" strokeLinecap="round" />
-            </svg>
-            <input
-              placeholder="Search products by name..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full bg-transparent text-sm outline-none"
-            />
-            <span className="shrink-0 text-xs text-zinc-400">
+          ))}
+        </div>
+        <div className="mb-4 flex items-center gap-2 rounded-lg border border-line px-3 py-2 transition-colors focus-within:border-brand-500">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} className="h-4 w-4 shrink-0 text-ink-muted">
+            <circle cx="11" cy="11" r="7" />
+            <path d="m20 20-3-3" strokeLinecap="round" />
+          </svg>
+          <input
+            placeholder="Search products by name..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full bg-transparent text-sm outline-none"
+          />
+          {!loading && (
+            <span className="shrink-0 text-xs text-ink-muted">
               {filteredProducts.length} of {products.length}
             </span>
-          </div>
-          {filteredProducts.length === 0 && (
-            <p className="text-sm text-zinc-500">No products match this filter.</p>
           )}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {visibleProducts.map((p) => (
-              <div
-                key={p.id}
-                className={`flex gap-3 rounded-2xl border border-black/10 p-3 shadow-sm transition-shadow hover:shadow-md dark:border-white/10 ${
-                  p.is_active ? "" : "opacity-50"
-                }`}
-              >
-                <ProductThumb product={p} onReplace={(url) => replaceProductImage(p.id, url)} />
-                <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-                  <span className="truncate text-sm font-medium">{p.name}</span>
-                  {p.size && <span className="text-xs text-zinc-500 dark:text-zinc-400">{p.size}</span>}
-                  <span className="w-fit rounded-full bg-brand-100 px-2 py-0.5 text-[11px] font-medium text-brand-700 dark:bg-brand-900/40 dark:text-brand-300">
-                    {categoryName(p.category_id)}
-                  </span>
-                  <div className="mt-auto flex flex-wrap items-center gap-2">
-                    <div className="flex items-center overflow-hidden rounded border border-black/10 focus-within:border-brand-500/50 dark:border-white/10 dark:focus-within:border-brand-400/40">
-                      <span className="bg-zinc-50 px-1.5 text-xs text-zinc-400 dark:bg-zinc-800">KES</span>
-                      <input
-                        type="number"
-                        min={0}
-                        step="0.01"
-                        value={priceDrafts[p.id] ?? String(p.price)}
-                        onChange={(e) => setPriceDrafts((d) => ({ ...d, [p.id]: e.target.value }))}
-                        className="w-24 appearance-none px-2 py-1 text-sm outline-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none dark:bg-zinc-900"
-                      />
+        </div>
+
+        {loading ? (
+          <SkeletonGrid count={6} />
+        ) : filteredProducts.length === 0 ? (
+          <EmptyState
+            title={products.length === 0 ? "No products yet" : "No products match this filter"}
+            hint={products.length === 0 ? "Load the starter catalogue or add a product above." : undefined}
+          />
+        ) : (
+          <>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {visibleProducts.map((p) => (
+                <div
+                  key={p.id}
+                  className={`flex gap-3 rounded-2xl border border-line bg-surface-raised p-3 shadow-sm transition-shadow hover:shadow-md ${
+                    p.is_active ? "" : "opacity-50"
+                  }`}
+                >
+                  <ProductThumb
+                    product={p}
+                    onReplace={(url) => replaceProductImage(p, url)}
+                    onError={(message) => toast.error(`Photo upload failed: ${message}`)}
+                  />
+                  <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+                    <span className="truncate text-sm font-medium">{p.name}</span>
+                    <span className="flex flex-wrap items-center gap-1.5">
+                      <Badge variant="brand">{categoryName(p.category_id)}</Badge>
+                      {p.size && <span className="text-xs text-ink-muted">{p.size}</span>}
+                      {p.price <= 0 && <Badge variant="warning">No price</Badge>}
+                    </span>
+                    <div className="mt-auto flex flex-wrap items-center gap-2">
+                      <div className="flex items-center overflow-hidden rounded-lg border border-line transition-colors focus-within:border-brand-500">
+                        <span className="bg-surface-sunken px-1.5 text-xs text-ink-muted">KES</span>
+                        <input
+                          type="number"
+                          min={0}
+                          step="0.01"
+                          value={priceDrafts[p.id] ?? String(p.price)}
+                          onChange={(e) => setPriceDrafts((d) => ({ ...d, [p.id]: e.target.value }))}
+                          className="w-24 appearance-none bg-transparent px-2 py-1 text-sm outline-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                        />
+                      </div>
+                      <Button size="sm" loading={savingId === p.id} onClick={() => savePrice(p)}>
+                        Save
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className={`ml-auto ${p.is_active ? "text-red-600 hover:text-red-700" : ""}`}
+                        onClick={() => toggleActive(p)}
+                      >
+                        {p.is_active ? "Deactivate" : "Reactivate"}
+                      </Button>
                     </div>
-                    <button
-                      onClick={() => savePrice(p.id)}
-                      disabled={savingId === p.id}
-                      className="rounded bg-accent-600 px-2 py-1 text-xs font-medium text-white hover:bg-accent-700 disabled:opacity-50 dark:bg-accent-500 dark:text-black dark:hover:bg-accent-400"
-                    >
-                      Save
-                    </button>
-                    <button
-                      onClick={() => toggleActive(p)}
-                      className="ml-auto text-xs text-zinc-500 hover:text-accent-600 dark:hover:text-accent-400"
-                    >
-                      {p.is_active ? "Deactivate" : "Reactivate"}
-                    </button>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
-          {visibleCount < filteredProducts.length && (
-            <button
-              onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}
-              className="mt-4 w-full rounded border border-black/10 py-2 text-sm text-zinc-600 hover:border-brand-500/50 hover:text-brand-600 dark:border-white/10 dark:text-zinc-400 dark:hover:border-brand-400/40 dark:hover:text-brand-400"
-            >
-              Load more ({filteredProducts.length - visibleCount} remaining)
-            </button>
-          )}
-        </section>
-      )}
+              ))}
+            </div>
+            {visibleCount < filteredProducts.length && (
+              <Button variant="secondary" className="mt-4 w-full" onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}>
+                Load more ({filteredProducts.length - visibleCount} remaining)
+              </Button>
+            )}
+          </>
+        )}
+      </section>
     </div>
   );
 }

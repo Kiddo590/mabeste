@@ -3,51 +3,58 @@
 import { useEffect, useState } from "react";
 import { getSupabaseClient } from "@/lib/supabase/client";
 import { createStaff } from "@/lib/auth/pin";
+import { useStaffSession } from "@/lib/auth/useStaffSession";
 import { RequireAdmin } from "../../_components/RequireAdmin";
+import { useToast } from "../../_components/Toast";
+import { useConfirm } from "../../_components/ConfirmDialog";
+import { Badge } from "../../_components/Badge";
+import { Button } from "../../_components/Button";
+import { Input, Select } from "../../_components/Field";
+import { PageHeader } from "../../_components/PageHeader";
+import { SkeletonRows } from "../../_components/Skeleton";
+import { EmptyState } from "../../_components/EmptyState";
 import type { Database } from "@/lib/supabase/types";
 
 type StaffRow = Database["public"]["Tables"]["staff"]["Row"];
 
 function AdminStaffContent() {
+  const session = useStaffSession();
+  const toast = useToast();
+  const confirm = useConfirm();
+
   const [staff, setStaff] = useState<StaffRow[]>([]);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [pin, setPin] = useState("");
   const [role, setRole] = useState<"admin" | "cashier">("cashier");
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
 
   async function loadStaff() {
-    const { data, error } = await getSupabaseClient()
-      .from("staff")
-      .select("*")
-      .order("name");
-    if (error) setLoadError(error.message);
+    const { data, error } = await getSupabaseClient().from("staff").select("*").order("name");
+    if (error) toast.error(`Couldn't load staff: ${error.message}`);
     else setStaff(data ?? []);
+    setLoading(false);
   }
 
   useEffect(() => {
-    getSupabaseClient()
-      .from("staff")
-      .select("*")
-      .order("name")
-      .then(({ data, error }) => {
-        if (error) setLoadError(error.message);
-        else setStaff(data ?? []);
-      });
+    loadStaff();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     setFormError(null);
     if (!/^\d{4,6}$/.test(pin)) {
-      setFormError("PIN must be 4-6 digits");
+      setFormError("PIN must be 4–6 digits");
       return;
     }
     setSubmitting(true);
     try {
-      await createStaff({ name, phone: phone || undefined, pin, role });
+      await createStaff({ name: name.trim(), phone: phone.trim() || undefined, pin, role });
+      toast.success(`${name.trim()} added`);
       setName("");
       setPhone("");
       setPin("");
@@ -61,92 +68,109 @@ function AdminStaffContent() {
   }
 
   async function toggleActive(row: StaffRow) {
+    if (row.is_active && row.id === session?.staff_id) {
+      toast.error("You can't deactivate your own account");
+      return;
+    }
+    if (row.is_active) {
+      const ok = await confirm({
+        title: `Deactivate ${row.name}?`,
+        message: "They won't be able to log in until reactivated. Their past sales stay on record.",
+        confirmLabel: "Deactivate",
+        danger: true,
+      });
+      if (!ok) return;
+    }
+    setBusyId(row.id);
     const { error } = await getSupabaseClient()
       .from("staff")
       .update({ is_active: !row.is_active })
       .eq("id", row.id);
-    if (!error) loadStaff();
+    setBusyId(null);
+    if (error) {
+      toast.error(`Couldn't update ${row.name}: ${error.message}`);
+      return;
+    }
+    toast.success(row.is_active ? `${row.name} deactivated` : `${row.name} reactivated`);
+    await loadStaff();
   }
 
   return (
-    <div className="flex flex-1 flex-col gap-6 p-6">
-      <section className="rounded-2xl border border-black/10 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-zinc-900">
-        <h1 className="mb-4 text-lg font-semibold">Staff</h1>
-        {loadError && <p className="text-red-600">{loadError}</p>}
-        <div className="overflow-x-auto">
-        <table className="w-full max-w-2xl text-left text-sm whitespace-nowrap">
-          <thead>
-            <tr className="border-b border-black/10 dark:border-white/10">
-              <th className="py-2 pr-4">Name</th>
-              <th className="py-2 pr-4">Phone</th>
-              <th className="py-2 pr-4">Role</th>
-              <th className="py-2 pr-4">Active</th>
-              <th className="py-2" />
-            </tr>
-          </thead>
-          <tbody>
-            {staff.map((s) => (
-              <tr key={s.id} className="border-b border-black/5 dark:border-white/5">
-                <td className="py-2 pr-4">{s.name}</td>
-                <td className="py-2 pr-4">{s.phone ?? "—"}</td>
-                <td className="py-2 pr-4">{s.role}</td>
-                <td className="py-2 pr-4">
-                  <span className={s.is_active ? "text-emerald-600 dark:text-emerald-400" : "text-zinc-500"}>
-                    {s.is_active ? "Yes" : "No"}
-                  </span>
-                </td>
-                <td className="py-2">
-                  <button onClick={() => toggleActive(s)} className="text-accent-600 hover:underline dark:text-accent-400">
-                    {s.is_active ? "Deactivate" : "Reactivate"}
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        </div>
+    <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
+      <PageHeader title="Staff" subtitle="Who can sign in to the till, and what they can do." />
+
+      <section className="rounded-2xl border border-line bg-surface p-4 shadow-sm md:p-6">
+        {loading ? (
+          <SkeletonRows rows={3} />
+        ) : staff.length === 0 ? (
+          <EmptyState title="No staff yet" hint="Add the first staff member below." />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm whitespace-nowrap">
+              <thead>
+                <tr className="border-b border-line text-ink-muted">
+                  <th className="py-2 pr-4 font-medium">Name</th>
+                  <th className="py-2 pr-4 font-medium">Phone</th>
+                  <th className="py-2 pr-4 font-medium">Role</th>
+                  <th className="py-2 pr-4 font-medium">Status</th>
+                  <th className="py-2" />
+                </tr>
+              </thead>
+              <tbody>
+                {staff.map((s) => (
+                  <tr key={s.id} className="border-b border-line last:border-0">
+                    <td className="py-2.5 pr-4 font-medium">
+                      {s.name}
+                      {s.id === session?.staff_id && <span className="ml-1 text-xs text-ink-muted">(you)</span>}
+                    </td>
+                    <td className="py-2.5 pr-4 text-ink-muted">{s.phone ?? "—"}</td>
+                    <td className="py-2.5 pr-4">
+                      <Badge variant={s.role === "admin" ? "brand" : "neutral"}>
+                        {s.role === "admin" ? "Admin" : "Cashier"}
+                      </Badge>
+                    </td>
+                    <td className="py-2.5 pr-4">
+                      <Badge variant={s.is_active ? "success" : "neutral"}>{s.is_active ? "Active" : "Inactive"}</Badge>
+                    </td>
+                    <td className="py-2.5 text-right">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        loading={busyId === s.id}
+                        onClick={() => toggleActive(s)}
+                        className={s.is_active ? "text-red-600 hover:text-red-700" : ""}
+                      >
+                        {s.is_active ? "Deactivate" : "Reactivate"}
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </section>
 
-      <section className="max-w-sm rounded-2xl border border-black/10 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-zinc-900">
-        <h2 className="mb-4 text-lg font-semibold">Add staff</h2>
+      <section className="max-w-sm rounded-2xl border border-line bg-surface p-4 shadow-sm md:p-6">
+        <h2 className="mb-4 text-base font-semibold">Add staff</h2>
         <form onSubmit={handleCreate} className="flex flex-col gap-3">
-          <input
-            placeholder="Name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            required
-            className="rounded border border-black/10 px-3 py-2 focus:border-brand-500/50 focus:outline-none dark:border-white/10 dark:bg-zinc-900 dark:focus:border-brand-400/40"
-          />
-          <input
-            placeholder="Phone (optional)"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            className="rounded border border-black/10 px-3 py-2 focus:border-brand-500/50 focus:outline-none dark:border-white/10 dark:bg-zinc-900 dark:focus:border-brand-400/40"
-          />
-          <input
-            placeholder="PIN (4-6 digits)"
+          <Input placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} required />
+          <Input placeholder="Phone (optional)" value={phone} onChange={(e) => setPhone(e.target.value)} />
+          <Input
+            placeholder="PIN (4–6 digits)"
             value={pin}
             onChange={(e) => setPin(e.target.value)}
             inputMode="numeric"
             required
-            className="rounded border border-black/10 px-3 py-2 focus:border-brand-500/50 focus:outline-none dark:border-white/10 dark:bg-zinc-900 dark:focus:border-brand-400/40"
           />
-          <select
-            value={role}
-            onChange={(e) => setRole(e.target.value as "admin" | "cashier")}
-            className="rounded border border-black/10 px-3 py-2 focus:border-brand-500/50 focus:outline-none dark:border-white/10 dark:bg-zinc-900 dark:focus:border-brand-400/40"
-          >
+          <Select value={role} onChange={(e) => setRole(e.target.value as "admin" | "cashier")}>
             <option value="cashier">Cashier</option>
             <option value="admin">Admin</option>
-          </select>
-          {formError && <p className="text-red-600">{formError}</p>}
-          <button
-            type="submit"
-            disabled={submitting}
-            className="rounded bg-accent-600 px-4 py-2 text-white transition-colors hover:bg-accent-700 disabled:opacity-50 dark:bg-accent-500 dark:text-black dark:hover:bg-accent-400"
-          >
-            {submitting ? "Creating..." : "Create staff"}
-          </button>
+          </Select>
+          {formError && <p className="text-sm text-red-600">{formError}</p>}
+          <Button type="submit" loading={submitting}>
+            Create staff
+          </Button>
         </form>
       </section>
     </div>
