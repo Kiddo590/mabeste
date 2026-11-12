@@ -429,3 +429,8 @@ verify_jwt = false
 # Public staff picker list (id/name only) for the pre-login PIN pad screen.
 [functions.staff-list]
 verify_jwt = false
+
+# Safaricom's Daraja callback carries no Supabase auth header; the function
+# validates a shared ?token= query param itself instead.
+[functions.mpesa-callback]
+verify_jwt = false

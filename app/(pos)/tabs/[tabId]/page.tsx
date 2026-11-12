@@ -14,6 +14,8 @@ import { Button } from "../../_components/Button";
 import { Input } from "../../_components/Field";
 import { SkeletonRows } from "../../_components/Skeleton";
 import { formatKES } from "@/lib/format";
+import { formatKenyanPhoneForDisplay, normalizeKenyanPhone } from "@/lib/phone";
+import { initiateMpesaPayment, queryMpesaPayment } from "@/lib/payments/mpesa";
 import type { Database } from "@/lib/supabase/types";
 
 type TabRow = Database["public"]["Tables"]["tabs"]["Row"] & { tables: { label: string } | null };
@@ -76,6 +78,16 @@ function TabDetailContent() {
   const [amountDraft, setAmountDraft] = useState("");
   const [cashTendered, setCashTendered] = useState("");
 
+  const [paymentMethod, setPaymentMethod] = useState<"cash" | "mpesa">("cash");
+  const [mpesaPhone, setMpesaPhone] = useState("");
+  const [mpesaStage, setMpesaStage] = useState<"idle" | "waiting" | "failed">("idle");
+  const [mpesaPaymentId, setMpesaPaymentId] = useState<string | null>(null);
+  const [mpesaCheckoutId, setMpesaCheckoutId] = useState<string | null>(null);
+  const [mpesaError, setMpesaError] = useState<string | null>(null);
+  const [mpesaElapsed, setMpesaElapsed] = useState(0);
+  const [mpesaSending, setMpesaSending] = useState(false);
+  const [mpesaChecking, setMpesaChecking] = useState(false);
+
   async function loadAll() {
     const supabase = getSupabaseClient();
     try {
@@ -116,6 +128,110 @@ function TabDetailContent() {
   useEffect(() => {
     setAmountDraft(total && total.balance > 0 ? String(total.balance) : "");
   }, [total?.balance]);
+
+  useEffect(() => {
+    if (tab?.customer_phone) setMpesaPhone(tab.customer_phone);
+  }, [tab?.customer_phone]);
+
+  // Realtime (primary) + 3s polling (fallback, in case the socket's custom
+  // JWT auth or the realtime publication doesn't come through) both watch
+  // the same pending payment row while waiting on the STK prompt.
+  useEffect(() => {
+    if (mpesaStage !== "waiting" || !mpesaPaymentId) return;
+    const paymentId = mpesaPaymentId;
+    const supabase = getSupabaseClient();
+    let cancelled = false;
+
+    async function poll() {
+      const { data } = await supabase
+        .from("payments")
+        .select("status, mpesa_receipt_number, failure_reason")
+        .eq("id", paymentId)
+        .maybeSingle();
+      if (cancelled || !data) return;
+      if (data.status === "completed") {
+        setMpesaStage("idle");
+        toast.success(`M-Pesa payment received${data.mpesa_receipt_number ? ` — receipt ${data.mpesa_receipt_number}` : ""}`);
+        await loadAll();
+      } else if (data.status === "failed") {
+        setMpesaStage("failed");
+        setMpesaError(data.failure_reason ?? "Payment failed");
+      }
+    }
+
+    const channel = supabase
+      .channel(`payment-${paymentId}`)
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "payments", filter: `id=eq.${paymentId}` },
+        () => poll()
+      )
+      .subscribe();
+    const pollTimer = setInterval(poll, 3000);
+    const tickTimer = setInterval(() => setMpesaElapsed((s) => s + 1), 1000);
+
+    return () => {
+      cancelled = true;
+      supabase.removeChannel(channel);
+      clearInterval(pollTimer);
+      clearInterval(tickTimer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mpesaStage, mpesaPaymentId]);
+
+  async function sendMpesaRequest() {
+    if (!total || !tab) return;
+    const amount = Number(amountDraft);
+    if (!amountDraft || Number.isNaN(amount) || amount <= 0 || amount > total.balance + 0.01) {
+      toast.error(`Enter an amount up to ${formatKES(total.balance)}`);
+      return;
+    }
+    const normalized = normalizeKenyanPhone(mpesaPhone);
+    if (!normalized) {
+      toast.error("Enter a valid Safaricom number (e.g. 07XX XXX XXX)");
+      return;
+    }
+    setMpesaSending(true);
+    try {
+      const result = await initiateMpesaPayment({ tab_id: tab.id, phone: normalized, amount });
+      setMpesaPaymentId(result.payment_id);
+      setMpesaCheckoutId(result.checkout_request_id);
+      setMpesaElapsed(0);
+      setMpesaError(null);
+      setMpesaStage("waiting");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Couldn't send the M-Pesa request");
+    } finally {
+      setMpesaSending(false);
+    }
+  }
+
+  async function checkMpesaStatus() {
+    if (!mpesaCheckoutId) return;
+    setMpesaChecking(true);
+    try {
+      const result = await queryMpesaPayment(mpesaCheckoutId);
+      if (result.status === "completed") {
+        setMpesaStage("idle");
+        toast.success(`M-Pesa payment received${result.receipt ? ` — receipt ${result.receipt}` : ""}`);
+        await loadAll();
+      } else if (result.status === "failed") {
+        setMpesaStage("failed");
+        setMpesaError(result.failure_reason ?? "Payment failed");
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Couldn't check payment status");
+    } finally {
+      setMpesaChecking(false);
+    }
+  }
+
+  function resetMpesa() {
+    setMpesaStage("idle");
+    setMpesaError(null);
+    setMpesaPaymentId(null);
+    setMpesaCheckoutId(null);
+  }
 
   // Every add is a fresh order_items row, even for a product already on the
   // tab — never an update to an existing line. That keeps void/edit
@@ -487,42 +603,97 @@ function TabDetailContent() {
 
           {total && total.balance > 0 && (
             <div className="no-print fixed inset-x-0 bottom-16 z-30 border-t border-line bg-surface p-3 md:bottom-0">
-              <div className="mx-auto flex max-w-xl flex-wrap items-end gap-2">
-                <div className="min-w-[140px] flex-1">
-                  <label className="mb-1 block text-xs text-ink-muted">Amount (balance {formatKES(total.balance)})</label>
-                  <div className="flex items-center overflow-hidden rounded-lg border border-line transition-colors focus-within:border-brand-500">
-                    <span className="bg-surface-sunken px-2 text-xs text-ink-muted">KES</span>
-                    <input
-                      type="number"
-                      min={0}
-                      max={total.balance}
-                      step="0.01"
-                      value={amountDraft}
-                      onChange={(e) => setAmountDraft(e.target.value)}
-                      className="w-full bg-transparent px-2 py-2 text-sm outline-none"
-                    />
+              <div className="mx-auto max-w-xl">
+                {mpesaStage === "waiting" ? (
+                  <div className="flex flex-col items-center gap-1.5 py-1 text-center">
+                    <p className="text-sm font-medium">
+                      Prompt sent to {formatKenyanPhoneForDisplay(normalizeKenyanPhone(mpesaPhone) ?? mpesaPhone)}
+                    </p>
+                    <p className="text-xs text-ink-muted">Ask the customer to enter their M-Pesa PIN on their phone.</p>
+                    <p className="tabular text-xs text-ink-muted">{Math.max(0, 90 - mpesaElapsed)}s</p>
+                    <div className="mt-1 flex gap-2">
+                      {mpesaElapsed >= 30 && (
+                        <Button variant="secondary" size="sm" loading={mpesaChecking} onClick={checkMpesaStatus}>
+                          Check status
+                        </Button>
+                      )}
+                      <Button variant="ghost" size="sm" onClick={resetMpesa}>
+                        Cancel
+                      </Button>
+                    </div>
                   </div>
-                </div>
-                <div className="w-28">
-                  <label className="mb-1 block text-xs text-ink-muted">Cash tendered</label>
-                  <Input
-                    type="number"
-                    min={0}
-                    step="0.01"
-                    value={cashTendered}
-                    onChange={(e) => setCashTendered(e.target.value)}
-                    className="w-full"
-                  />
-                </div>
-                <Button loading={busy} onClick={recordCashPayment} className="h-[38px]">
-                  Cash payment
-                </Button>
+                ) : (
+                  <>
+                    <div className="mb-2 flex gap-2">
+                      <button onClick={() => setPaymentMethod("cash")} className={pill(paymentMethod === "cash")}>
+                        Cash
+                      </button>
+                      <button onClick={() => setPaymentMethod("mpesa")} className={pill(paymentMethod === "mpesa")}>
+                        M-Pesa
+                      </button>
+                    </div>
+                    {mpesaStage === "failed" && (
+                      <p className="mb-2 text-sm text-red-600">{mpesaError ?? "Payment failed"} — try again.</p>
+                    )}
+                    <div className="flex flex-wrap items-end gap-2">
+                      <div className="min-w-[140px] flex-1">
+                        <label className="mb-1 block text-xs text-ink-muted">Amount (balance {formatKES(total.balance)})</label>
+                        <div className="flex items-center overflow-hidden rounded-lg border border-line transition-colors focus-within:border-brand-500">
+                          <span className="bg-surface-sunken px-2 text-xs text-ink-muted">KES</span>
+                          <input
+                            type="number"
+                            min={0}
+                            max={total.balance}
+                            step="0.01"
+                            value={amountDraft}
+                            onChange={(e) => setAmountDraft(e.target.value)}
+                            className="w-full bg-transparent px-2 py-2 text-sm outline-none"
+                          />
+                        </div>
+                      </div>
+                      {paymentMethod === "cash" ? (
+                        <>
+                          <div className="w-28">
+                            <label className="mb-1 block text-xs text-ink-muted">Cash tendered</label>
+                            <Input
+                              type="number"
+                              min={0}
+                              step="0.01"
+                              value={cashTendered}
+                              onChange={(e) => setCashTendered(e.target.value)}
+                              className="w-full"
+                            />
+                          </div>
+                          <Button loading={busy} onClick={recordCashPayment} className="h-[38px]">
+                            Cash payment
+                          </Button>
+                        </>
+                      ) : (
+                        <>
+                          <div className="w-36">
+                            <label className="mb-1 block text-xs text-ink-muted">Safaricom number</label>
+                            <Input
+                              type="tel"
+                              placeholder="07XX XXX XXX"
+                              value={mpesaPhone}
+                              onChange={(e) => setMpesaPhone(e.target.value)}
+                              className="w-full"
+                            />
+                          </div>
+                          <Button loading={mpesaSending} onClick={sendMpesaRequest} className="h-[38px]">
+                            Send M-Pesa request
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                    {paymentMethod === "cash" && change !== null && (
+                      <p className="mt-1 text-right text-sm text-ink-muted">
+                        Change due: <span className="tabular font-medium text-foreground">{formatKES(change)}</span>
+                      </p>
+                    )}
+                  </>
+                )}
               </div>
-              {change !== null && (
-                <p className="mx-auto mt-1 max-w-xl text-right text-sm text-ink-muted">
-                  Change due: <span className="tabular font-medium text-foreground">{formatKES(change)}</span>
-                </p>
-              )}
             </div>
           )}
         </>

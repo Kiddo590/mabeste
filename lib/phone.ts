@@ -12,5 +12,6 @@ export function normalizeKenyanPhone(input: string): string | null {
 
 export function formatKenyanPhoneForDisplay(normalized: string): string {
   if (!/^254\d{9}$/.test(normalized)) return normalized;
-  return `0${normalized.slice(3, 5)} ${normalized.slice(5, 8)} ${normalized.slice(8)}`;
+  const local = `0${normalized.slice(3)}`; // 254712345678 -> 0712345678
+  return `${local.slice(0, 4)} ${local.slice(4, 7)} ${local.slice(7)}`; // 0712 345 678
 }
