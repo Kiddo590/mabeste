@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { getSupabaseClient } from "@/lib/supabase/client";
-import { createStaff } from "@/lib/auth/pin";
+import { createStaff, resetStaffPin } from "@/lib/auth/pin";
 import { useStaffSession } from "@/lib/auth/useStaffSession";
 import { RequireAdmin } from "../../_components/RequireAdmin";
 import { useToast } from "../../_components/Toast";
@@ -31,6 +31,19 @@ function AdminStaffContent() {
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editDraft, setEditDraft] = useState<{ name: string; phone: string; role: "admin" | "cashier" }>({
+    name: "",
+    phone: "",
+    role: "cashier",
+  });
+  const [editSaving, setEditSaving] = useState(false);
+
+  const [resettingId, setResettingId] = useState<string | null>(null);
+  const [pinDraft, setPinDraft] = useState("");
+  const [pinError, setPinError] = useState<string | null>(null);
+  const [pinSaving, setPinSaving] = useState(false);
 
   async function loadStaff() {
     const { data, error } = await getSupabaseClient().from("staff").select("*").order("name");
@@ -95,6 +108,62 @@ function AdminStaffContent() {
     await loadStaff();
   }
 
+  function startEdit(row: StaffRow) {
+    setResettingId(null);
+    setEditingId(row.id);
+    setEditDraft({ name: row.name, phone: row.phone ?? "", role: row.role as "admin" | "cashier" });
+  }
+
+  async function saveEdit(row: StaffRow) {
+    if (!editDraft.name.trim()) {
+      toast.error("Name can't be empty");
+      return;
+    }
+    if (row.id === session?.staff_id && editDraft.role !== "admin") {
+      toast.error("You can't change your own role");
+      return;
+    }
+    setEditSaving(true);
+    try {
+      const { error } = await getSupabaseClient()
+        .from("staff")
+        .update({ name: editDraft.name.trim(), phone: editDraft.phone.trim() || null, role: editDraft.role })
+        .eq("id", row.id);
+      if (error) throw new Error(error.message);
+      toast.success(`${editDraft.name.trim()} updated`);
+      setEditingId(null);
+      await loadStaff();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Couldn't save changes");
+    } finally {
+      setEditSaving(false);
+    }
+  }
+
+  function startReset(row: StaffRow) {
+    setEditingId(null);
+    setResettingId(row.id);
+    setPinDraft("");
+    setPinError(null);
+  }
+
+  async function saveReset(row: StaffRow) {
+    if (!/^\d{4,6}$/.test(pinDraft)) {
+      setPinError("PIN must be 4–6 digits");
+      return;
+    }
+    setPinSaving(true);
+    try {
+      await resetStaffPin(row.id, pinDraft);
+      toast.success(`PIN reset for ${row.name}`);
+      setResettingId(null);
+    } catch (err) {
+      setPinError(err instanceof Error ? err.message : "Couldn't reset PIN");
+    } finally {
+      setPinSaving(false);
+    }
+  }
+
   return (
     <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
       <PageHeader title="Staff" subtitle="Who can sign in to the till, and what they can do." />
@@ -118,32 +187,106 @@ function AdminStaffContent() {
               </thead>
               <tbody>
                 {staff.map((s) => (
-                  <tr key={s.id} className="border-b border-line last:border-0">
-                    <td className="py-2.5 pr-4 font-medium">
-                      {s.name}
-                      {s.id === session?.staff_id && <span className="ml-1 text-xs text-ink-muted">(you)</span>}
-                    </td>
-                    <td className="py-2.5 pr-4 text-ink-muted">{s.phone ?? "—"}</td>
-                    <td className="py-2.5 pr-4">
-                      <Badge variant={s.role === "admin" ? "brand" : "neutral"}>
-                        {s.role === "admin" ? "Admin" : "Cashier"}
-                      </Badge>
-                    </td>
-                    <td className="py-2.5 pr-4">
-                      <Badge variant={s.is_active ? "success" : "neutral"}>{s.is_active ? "Active" : "Inactive"}</Badge>
-                    </td>
-                    <td className="py-2.5 text-right">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        loading={busyId === s.id}
-                        onClick={() => toggleActive(s)}
-                        className={s.is_active ? "text-red-600 hover:text-red-700" : ""}
-                      >
-                        {s.is_active ? "Deactivate" : "Reactivate"}
-                      </Button>
-                    </td>
-                  </tr>
+                  <Fragment key={s.id}>
+                    <tr className="border-b border-line last:border-0">
+                      {editingId === s.id ? (
+                        <>
+                          <td className="py-2 pr-4">
+                            <Input
+                              value={editDraft.name}
+                              onChange={(e) => setEditDraft((d) => ({ ...d, name: e.target.value }))}
+                              className="min-w-[8rem]"
+                            />
+                          </td>
+                          <td className="py-2 pr-4">
+                            <Input
+                              value={editDraft.phone}
+                              onChange={(e) => setEditDraft((d) => ({ ...d, phone: e.target.value }))}
+                              placeholder="Phone"
+                              className="min-w-[8rem]"
+                            />
+                          </td>
+                          <td className="py-2 pr-4">
+                            <Select
+                              value={editDraft.role}
+                              onChange={(e) => setEditDraft((d) => ({ ...d, role: e.target.value as "admin" | "cashier" }))}
+                              disabled={s.id === session?.staff_id}
+                            >
+                              <option value="cashier">Cashier</option>
+                              <option value="admin">Admin</option>
+                            </Select>
+                          </td>
+                          <td className="py-2.5 pr-4">
+                            <Badge variant={s.is_active ? "success" : "neutral"}>{s.is_active ? "Active" : "Inactive"}</Badge>
+                          </td>
+                          <td className="py-2 text-right whitespace-nowrap">
+                            <Button variant="ghost" size="sm" onClick={() => setEditingId(null)}>
+                              Cancel
+                            </Button>
+                            <Button size="sm" loading={editSaving} onClick={() => saveEdit(s)}>
+                              Save
+                            </Button>
+                          </td>
+                        </>
+                      ) : (
+                        <>
+                          <td className="py-2.5 pr-4 font-medium">
+                            {s.name}
+                            {s.id === session?.staff_id && <span className="ml-1 text-xs text-ink-muted">(you)</span>}
+                          </td>
+                          <td className="py-2.5 pr-4 text-ink-muted">{s.phone ?? "—"}</td>
+                          <td className="py-2.5 pr-4">
+                            <Badge variant={s.role === "admin" ? "brand" : "neutral"}>
+                              {s.role === "admin" ? "Admin" : "Cashier"}
+                            </Badge>
+                          </td>
+                          <td className="py-2.5 pr-4">
+                            <Badge variant={s.is_active ? "success" : "neutral"}>{s.is_active ? "Active" : "Inactive"}</Badge>
+                          </td>
+                          <td className="py-2.5 text-right whitespace-nowrap">
+                            <Button variant="ghost" size="sm" onClick={() => startEdit(s)}>
+                              Edit
+                            </Button>
+                            <Button variant="ghost" size="sm" onClick={() => startReset(s)}>
+                              Reset PIN
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              loading={busyId === s.id}
+                              onClick={() => toggleActive(s)}
+                              className={s.is_active ? "text-red-600 hover:text-red-700" : ""}
+                            >
+                              {s.is_active ? "Deactivate" : "Reactivate"}
+                            </Button>
+                          </td>
+                        </>
+                      )}
+                    </tr>
+                    {resettingId === s.id && (
+                      <tr className="border-b border-line bg-surface-sunken last:border-0">
+                        <td colSpan={5} className="py-3">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-sm text-ink-muted">New PIN for {s.name}:</span>
+                            <Input
+                              value={pinDraft}
+                              onChange={(e) => setPinDraft(e.target.value)}
+                              inputMode="numeric"
+                              placeholder="4–6 digits"
+                              className="w-32"
+                            />
+                            <Button variant="ghost" size="sm" onClick={() => setResettingId(null)}>
+                              Cancel
+                            </Button>
+                            <Button size="sm" loading={pinSaving} onClick={() => saveReset(s)}>
+                              Set PIN
+                            </Button>
+                            {pinError && <span className="text-sm text-red-600">{pinError}</span>}
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
                 ))}
               </tbody>
             </table>

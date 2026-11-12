@@ -66,6 +66,31 @@ function InventoryIcon({ className }: IconProps) {
   );
 }
 
+function TablesIcon({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} className={className}>
+      <path d="M3 9h18M6 9v11M18 9v11M3 9l1.5-5h15L21 9" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function CategoriesIcon({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} className={className}>
+      <path d="M4 5h7l2 2h7v12H4V5Z" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function AdminHubIcon({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} className={className}>
+      <path d="M12 2.5 3.5 6v6c0 5 3.6 8.2 8.5 9.5 4.9-1.3 8.5-4.5 8.5-9.5V6L12 2.5Z" strokeLinejoin="round" />
+      <path d="m9 12 2 2 4-4" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 type NavItem = {
   href: string;
   label: string;
@@ -73,13 +98,24 @@ type NavItem = {
   icon: (props: IconProps) => React.ReactNode;
 };
 
-const NAV_ITEMS: NavItem[] = [
+// Desktop has room for every admin link directly; the mobile bottom bar
+// doesn't, so admin-only pages besides Reports funnel through /admin instead.
+const DESKTOP_NAV_ITEMS: NavItem[] = [
   { href: "/dashboard", label: "Home", adminOnly: false, icon: HomeIcon },
   { href: "/tabs", label: "Tabs", adminOnly: false, icon: TabsIcon },
   { href: "/reports", label: "Reports", adminOnly: true, icon: ReportsIcon },
   { href: "/admin/staff", label: "Staff", adminOnly: true, icon: StaffIcon },
   { href: "/admin/products", label: "Products", adminOnly: true, icon: ProductsIcon },
   { href: "/admin/inventory", label: "Inventory", adminOnly: true, icon: InventoryIcon },
+  { href: "/admin/tables", label: "Tables", adminOnly: true, icon: TablesIcon },
+  { href: "/admin/categories", label: "Categories", adminOnly: true, icon: CategoriesIcon },
+];
+
+const MOBILE_NAV_ITEMS: NavItem[] = [
+  { href: "/dashboard", label: "Home", adminOnly: false, icon: HomeIcon },
+  { href: "/tabs", label: "Tabs", adminOnly: false, icon: TabsIcon },
+  { href: "/reports", label: "Reports", adminOnly: true, icon: ReportsIcon },
+  { href: "/admin", label: "Admin", adminOnly: true, icon: AdminHubIcon },
 ];
 
 function PosLayoutInner({ children }: { children: React.ReactNode }) {
@@ -108,7 +144,8 @@ function PosLayoutInner({ children }: { children: React.ReactNode }) {
   }
 
   const isAdmin = session.staff_role === "admin";
-  const items = NAV_ITEMS.filter((i) => !i.adminOnly || isAdmin);
+  const desktopItems = DESKTOP_NAV_ITEMS.filter((i) => !i.adminOnly || isAdmin);
+  const mobileItems = MOBILE_NAV_ITEMS.filter((i) => !i.adminOnly || isAdmin);
   const isActive = (href: string) => pathname === href || pathname?.startsWith(href + "/");
 
   return (
@@ -121,7 +158,7 @@ function PosLayoutInner({ children }: { children: React.ReactNode }) {
                 Mabeshte POS
               </Link>
               <nav className="hidden items-center gap-4 md:flex">
-                {items.map((item) => (
+                {desktopItems.map((item) => (
                   <Link
                     key={item.href}
                     href={item.href}
@@ -151,7 +188,7 @@ function PosLayoutInner({ children }: { children: React.ReactNode }) {
           <main className="flex flex-1 flex-col pb-16 md:pb-0">{children}</main>
 
           <nav className="no-print fixed inset-x-0 bottom-0 z-40 flex items-stretch justify-around border-t border-line bg-surface pb-[env(safe-area-inset-bottom)] md:hidden">
-            {items.map((item) => {
+            {mobileItems.map((item) => {
               const Icon = item.icon;
               const active = isActive(item.href);
               return (

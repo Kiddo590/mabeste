@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import Image from "next/image";
 import { getSupabaseClient } from "@/lib/supabase/client";
 import { uploadProductImage } from "@/lib/supabase/storage";
@@ -107,6 +108,16 @@ function AdminProductsContent() {
   const [importing, setImporting] = useState(false);
   const [priceDrafts, setPriceDrafts] = useState<Record<string, string>>({});
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editDraft, setEditDraft] = useState<{
+    name: string;
+    category_id: string;
+    size: string;
+    sku: string;
+    track_stock: boolean;
+    low_stock_threshold: string;
+  } | null>(null);
+  const [editSaving, setEditSaving] = useState(false);
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
@@ -289,6 +300,54 @@ function AdminProductsContent() {
     await loadAll();
   }
 
+  function startEdit(product: ProductRow) {
+    setEditingId(product.id);
+    setEditDraft({
+      name: product.name,
+      category_id: product.category_id ?? "",
+      size: product.size ?? "",
+      sku: product.sku ?? "",
+      track_stock: product.track_stock,
+      low_stock_threshold: String(product.low_stock_threshold),
+    });
+  }
+
+  async function saveEdit(product: ProductRow) {
+    if (!editDraft) return;
+    if (!editDraft.name.trim()) {
+      toast.error("Name can't be empty");
+      return;
+    }
+    const threshold = Number(editDraft.low_stock_threshold);
+    if (Number.isNaN(threshold) || threshold < 0) {
+      toast.error("Low-stock threshold must be a positive number");
+      return;
+    }
+    setEditSaving(true);
+    try {
+      const { error } = await getSupabaseClient()
+        .from("products")
+        .update({
+          name: editDraft.name.trim(),
+          category_id: editDraft.category_id || null,
+          size: editDraft.size.trim() || null,
+          sku: editDraft.sku.trim() || null,
+          track_stock: editDraft.track_stock,
+          low_stock_threshold: threshold,
+        })
+        .eq("id", product.id);
+      if (error) throw new Error(error.message);
+      toast.success(`${editDraft.name.trim()} updated`);
+      setEditingId(null);
+      setEditDraft(null);
+      await loadAll();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Couldn't save changes");
+    } finally {
+      setEditSaving(false);
+    }
+  }
+
   async function addProduct(e: React.FormEvent) {
     e.preventDefault();
     setAddError(null);
@@ -357,9 +416,14 @@ function AdminProductsContent() {
                 : "Everything is priced and ready to sell."
         }
         actions={
-          <Button variant={products.length === 0 ? "primary" : "secondary"} loading={importing} onClick={importStarterCatalogue}>
-            {importing ? "Loading catalogue..." : "Load starter catalogue"}
-          </Button>
+          <>
+            <Link href="/admin/categories">
+              <Button variant="ghost">Manage categories</Button>
+            </Link>
+            <Button variant={products.length === 0 ? "primary" : "secondary"} loading={importing} onClick={importStarterCatalogue}>
+              {importing ? "Loading catalogue..." : "Load starter catalogue"}
+            </Button>
+          </>
         }
       />
 
@@ -452,38 +516,105 @@ function AdminProductsContent() {
                     onReplace={(url) => replaceProductImage(p, url)}
                     onError={(message) => toast.error(`Photo upload failed: ${message}`)}
                   />
-                  <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-                    <span className="truncate text-sm font-medium">{p.name}</span>
-                    <span className="flex flex-wrap items-center gap-1.5">
-                      <Badge variant="brand">{categoryName(p.category_id)}</Badge>
-                      {p.size && <span className="text-xs text-ink-muted">{p.size}</span>}
-                      {p.price <= 0 && <Badge variant="warning">No price</Badge>}
-                    </span>
-                    <div className="mt-auto flex flex-wrap items-center gap-2">
-                      <div className="flex items-center overflow-hidden rounded-lg border border-line transition-colors focus-within:border-brand-500">
-                        <span className="bg-surface-sunken px-1.5 text-xs text-ink-muted">KES</span>
-                        <input
-                          type="number"
-                          min={0}
-                          step="0.01"
-                          value={priceDrafts[p.id] ?? String(p.price)}
-                          onChange={(e) => setPriceDrafts((d) => ({ ...d, [p.id]: e.target.value }))}
-                          className="w-24 appearance-none bg-transparent px-2 py-1 text-sm outline-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                  {editingId === p.id && editDraft ? (
+                    <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+                      <Input
+                        value={editDraft.name}
+                        onChange={(e) => setEditDraft((d) => (d ? { ...d, name: e.target.value } : d))}
+                      />
+                      <div className="flex flex-wrap gap-1.5">
+                        <Select
+                          value={editDraft.category_id}
+                          onChange={(e) => setEditDraft((d) => (d ? { ...d, category_id: e.target.value } : d))}
+                          className="flex-1"
+                        >
+                          <option value="">No category</option>
+                          {categories.map((c) => (
+                            <option key={c.id} value={c.id}>
+                              {c.name}
+                            </option>
+                          ))}
+                        </Select>
+                        <Input
+                          placeholder="Size"
+                          value={editDraft.size}
+                          onChange={(e) => setEditDraft((d) => (d ? { ...d, size: e.target.value } : d))}
+                          className="w-20"
                         />
                       </div>
-                      <Button size="sm" loading={savingId === p.id} onClick={() => savePrice(p)}>
-                        Save
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className={`ml-auto ${p.is_active ? "text-red-600 hover:text-red-700" : ""}`}
-                        onClick={() => toggleActive(p)}
-                      >
-                        {p.is_active ? "Deactivate" : "Reactivate"}
-                      </Button>
+                      <Input
+                        placeholder="SKU (optional)"
+                        value={editDraft.sku}
+                        onChange={(e) => setEditDraft((d) => (d ? { ...d, sku: e.target.value } : d))}
+                      />
+                      <div className="flex items-center gap-2">
+                        <label className="flex items-center gap-1.5 text-xs text-ink-muted">
+                          <input
+                            type="checkbox"
+                            checked={editDraft.track_stock}
+                            onChange={(e) => setEditDraft((d) => (d ? { ...d, track_stock: e.target.checked } : d))}
+                          />
+                          Track stock
+                        </label>
+                        {editDraft.track_stock && (
+                          <input
+                            type="number"
+                            min={0}
+                            value={editDraft.low_stock_threshold}
+                            onChange={(e) =>
+                              setEditDraft((d) => (d ? { ...d, low_stock_threshold: e.target.value } : d))
+                            }
+                            title="Low-stock threshold"
+                            className="w-16 rounded-lg border border-line bg-transparent px-2 py-1 text-xs outline-none focus:border-brand-500"
+                          />
+                        )}
+                      </div>
+                      <div className="mt-auto flex items-center gap-2">
+                        <Button size="sm" loading={editSaving} onClick={() => saveEdit(p)}>
+                          Save
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => setEditingId(null)}>
+                          Cancel
+                        </Button>
+                      </div>
                     </div>
-                  </div>
+                  ) : (
+                    <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+                      <span className="truncate text-sm font-medium">{p.name}</span>
+                      <span className="flex flex-wrap items-center gap-1.5">
+                        <Badge variant="brand">{categoryName(p.category_id)}</Badge>
+                        {p.size && <span className="text-xs text-ink-muted">{p.size}</span>}
+                        {p.price <= 0 && <Badge variant="warning">No price</Badge>}
+                      </span>
+                      <div className="mt-auto flex flex-wrap items-center gap-2">
+                        <div className="flex items-center overflow-hidden rounded-lg border border-line transition-colors focus-within:border-brand-500">
+                          <span className="bg-surface-sunken px-1.5 text-xs text-ink-muted">KES</span>
+                          <input
+                            type="number"
+                            min={0}
+                            step="0.01"
+                            value={priceDrafts[p.id] ?? String(p.price)}
+                            onChange={(e) => setPriceDrafts((d) => ({ ...d, [p.id]: e.target.value }))}
+                            className="w-24 appearance-none bg-transparent px-2 py-1 text-sm outline-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                          />
+                        </div>
+                        <Button size="sm" loading={savingId === p.id} onClick={() => savePrice(p)}>
+                          Save
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => startEdit(p)}>
+                          Edit
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className={`ml-auto ${p.is_active ? "text-red-600 hover:text-red-700" : ""}`}
+                          onClick={() => toggleActive(p)}
+                        >
+                          {p.is_active ? "Deactivate" : "Reactivate"}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

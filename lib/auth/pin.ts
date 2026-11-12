@@ -74,3 +74,17 @@ export async function createStaff(input: {
   const body = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(body.error ?? "Failed to create staff");
 }
+
+export async function resetStaffPin(staffId: string, pin: string): Promise<void> {
+  const session = getSession();
+  if (!session) throw new Error("Not logged in");
+
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/staff-reset-pin`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
+    body: JSON.stringify({ staff_id: staffId, pin }),
+  });
+
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body.error ?? "Failed to reset PIN");
+}
